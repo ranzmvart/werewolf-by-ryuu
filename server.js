@@ -1,3 +1,17 @@
+// Compatibility guard for older Node runtimes and undici-based dependencies.
+try {
+  const { toUSVString } = require('util');
+  const { Blob, File } = require('buffer');
+  if (typeof globalThis.Blob === 'undefined') globalThis.Blob = Blob;
+  if (typeof globalThis.File === 'undefined') globalThis.File = File;
+  if (typeof String.prototype.toWellFormed === 'undefined') {
+    String.prototype.toWellFormed = function () { return toUSVString(this); };
+  }
+  if (typeof String.prototype.isWellFormed === 'undefined') {
+    String.prototype.isWellFormed = function () { return toUSVString(this) === this; };
+  }
+} catch (_) {}
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -13,7 +27,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '2.4.0-shared-music' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);
@@ -103,6 +117,68 @@ function nowId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+
+function publicMusic(music = {}) {
+  return {
+    status: music.status || 'stopped',
+    song: music.song || null,
+    startedAt: music.startedAt || null,
+    positionSec: Number(music.positionSec || 0),
+    updatedAt: music.updatedAt || Date.now(),
+    by: music.by || null
+  };
+}
+
+function sanitizeMusicSong(song = {}) {
+  const source = String(song.source || '').slice(0, 20);
+  const allowed = new Set(['youtube', 'online', 'radio', 'built-in']);
+  if (!allowed.has(source)) return null;
+  const safe = {
+    source,
+    id: String(song.id || song.videoId || song.url || '').slice(0, 160),
+    emoji: String(song.emoji || (source === 'youtube' ? '▶' : '🎵')).slice(0, 4),
+    title: String(song.title || 'Unknown Song').replace(/<[^>]*>/g, '').trim().slice(0, 120),
+    artist: String(song.artist || source).replace(/<[^>]*>/g, '').trim().slice(0, 90),
+    mood: String(song.mood || '').replace(/<[^>]*>/g, '').trim().slice(0, 120),
+    duration: String(song.duration || '').slice(0, 20),
+    thumbnail: String(song.thumbnail || '').slice(0, 300)
+  };
+  if (source === 'youtube') {
+    const videoId = String(song.videoId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32);
+    if (!videoId) return null;
+    safe.videoId = videoId;
+    safe.watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    return safe;
+  }
+  if (source === 'online' || source === 'radio') {
+    const url = String(song.url || '');
+    if (!/^https?:\/\//i.test(url)) return null;
+    safe.url = url.slice(0, 600);
+    return safe;
+  }
+  if (source === 'built-in') {
+    // Built-in synth metadata is safe to share, clients already have the song by id.
+    return safe;
+  }
+  return null;
+}
+
+function emitRoomMusic(room) {
+  io.to(room.code).emit('music:room-state', publicMusic(room.music));
+}
+
+function setRoomMusic(room, music) {
+  room.music = {
+    status: music.status || 'stopped',
+    song: music.song || null,
+    startedAt: music.startedAt || null,
+    positionSec: Number(music.positionSec || 0),
+    updatedAt: Date.now(),
+    by: music.by || null
+  };
+  emitRoomMusic(room);
+}
+
 function cleanClientId(id) {
   const raw = String(id || '').trim();
   const safe = raw.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
@@ -137,6 +213,14 @@ function newRoom(code, hostPlayerId, hostName) {
     votes: new Map(),
     mayorVotes: new Map(),
     voice: new Set(),
+    music: {
+      status: 'stopped',
+      song: null,
+      startedAt: null,
+      positionSec: 0,
+      updatedAt: Date.now(),
+      by: null
+    },
     hunterQueue: [],
     gameOver: null,
     createdAt: Date.now(),
@@ -170,7 +254,8 @@ function roomPublic(room) {
     voteState: getVoteState(room),
     mayorState: getMayorVoteState(room),
     gameOver: room.gameOver,
-    autoResetAt: room.autoResetAt || null
+    autoResetAt: room.autoResetAt || null,
+    music: publicMusic(room.music)
   };
 }
 
@@ -965,6 +1050,57 @@ io.on('connection', socket => {
     } else {
       io.to(targetRoom).emit('chat:message', payload);
     }
+  });
+
+
+  socket.on('music:room-play', ({ song, positionSec = 0 } = {}, cb) => {
+    const ctx = getPlayerBySocket(socket.id);
+    const room = ctx?.room;
+    const player = ctx?.player;
+    if (!room || !player || room.hostId !== player.id) return cb?.({ ok: false, error: 'Hanya host yang bisa memutar musik bersama.' });
+    const safeSong = sanitizeMusicSong(song);
+    if (!safeSong) return cb?.({ ok: false, error: 'Lagu tidak valid untuk diputar bersama.' });
+    setRoomMusic(room, {
+      status: 'playing',
+      song: safeSong,
+      startedAt: Date.now(),
+      positionSec: Math.max(0, Number(positionSec || 0)),
+      by: player.name
+    });
+    addLog(room, `🎧 Host memutar musik lobby: ${safeSong.title} — ${safeSong.artist}`, 'music');
+    cb?.({ ok: true, music: publicMusic(room.music) });
+  });
+
+  socket.on('music:room-pause', ({ positionSec = 0 } = {}, cb) => {
+    const ctx = getPlayerBySocket(socket.id);
+    const room = ctx?.room;
+    const player = ctx?.player;
+    if (!room || !player || room.hostId !== player.id) return cb?.({ ok: false, error: 'Hanya host yang bisa pause musik bersama.' });
+    if (!room.music?.song) return cb?.({ ok: false, error: 'Belum ada musik bersama.' });
+    setRoomMusic(room, {
+      status: 'paused',
+      song: room.music.song,
+      startedAt: null,
+      positionSec: Math.max(0, Number(positionSec || 0)),
+      by: player.name
+    });
+    cb?.({ ok: true, music: publicMusic(room.music) });
+  });
+
+  socket.on('music:room-stop', (_data = {}, cb) => {
+    const ctx = getPlayerBySocket(socket.id);
+    const room = ctx?.room;
+    const player = ctx?.player;
+    if (!room || !player || room.hostId !== player.id) return cb?.({ ok: false, error: 'Hanya host yang bisa stop musik bersama.' });
+    setRoomMusic(room, { status: 'stopped', song: null, startedAt: null, positionSec: 0, by: player.name });
+    cb?.({ ok: true });
+  });
+
+  socket.on('music:room-request', (_data = {}, cb) => {
+    const room = findRoomBySocket(socket.id);
+    if (!room) return cb?.({ ok: false, error: 'Belum berada di room.' });
+    socket.emit('music:room-state', publicMusic(room.music));
+    cb?.({ ok: true, music: publicMusic(room.music) });
   });
 
   socket.on('voice:join', () => {

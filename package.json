@@ -1,14 +1,15 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "2.3.0",
-  "description": "Werewolf Online Realtime Web Game by Ryuu - YouTube Music Search, Voice, Reconnect, Auto Reset",
+  "version": "2.4.0",
+  "description": "Werewolf Online by Ryuu - Shared Room Music, YouTube Search, Voice, Reconnect, Auto Reset",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "22.x",
+    "npm": ">=10"
   },
   "dependencies": {
     "express": "^4.19.2",

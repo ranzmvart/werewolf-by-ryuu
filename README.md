@@ -1,41 +1,43 @@
-# Werewolf by Ryuu — YouTube Music Final
+# Werewolf by Ryuu Final - Shared Room Music
 
 Versi final untuk Railway/Node.js hosting.
 
-## Fitur utama
+## Fitur Baru 2.4.0
 
-- Multiplayer realtime dengan Socket.IO
-- Room, role rahasia, voting, Kades vote x2
-- Animasi role, kill, save, win, lose
-- Voice WebRTC untuk pemain
-- Reconnect/join ulang ke room
-- Auto reset room setelah game selesai
-- UI clean untuk HP dan laptop
-- Music player:
-  - Cari lagu YouTube dari dalam game
-  - Pilih hasil seperti playlist
-  - Putar lewat embedded YouTube player
-  - Preview iTunes/Apple Music
-  - Radio online publik
-  - Upload lagu lokal dari perangkat
+- Host bisa memutar musik bersama untuk semua pemain dalam room.
+- Tombol `Room` pada setiap lagu YouTube/Preview/Radio untuk memutar ke semua pemain.
+- Tombol `Putar ke Room`, `Pause Room`, dan `Stop Room` khusus host.
+- Pemain HP mendapat tombol `Aktifkan di HP` agar audio bisa jalan setelah satu kali tap.
+- Musik room tersimpan di state room, jadi pemain yang reconnect/join ulang bisa sync ulang.
+- YouTube Music Search tetap tersedia.
+- Reconnect, voice room, role, animasi, Kades vote x2, dan auto reset room tetap ada.
+
+## Kenapa HP perlu tombol Aktifkan?
+
+Browser HP sering memblokir audio yang diputar otomatis. Karena itu setiap pemain perlu menekan `Aktifkan di HP` minimal sekali setelah masuk room. Setelah itu, lagu dari host bisa disync lebih lancar.
 
 ## Deploy Railway
 
-Build command:
+Upload isi folder ini ke GitHub repo kamu:
 
-```bash
-npm install --omit=dev
+```text
+public/
+package.json
+railway.json
+Dockerfile
+README.md
+server.js
 ```
 
-Start command:
+Railway akan build menggunakan Dockerfile dan Node 22.
 
-```bash
-npm start
-```
+## Cara Pakai Musik Bersama
 
-Railway akan memberi variabel PORT otomatis. Server sudah listen ke `0.0.0.0`.
+1. Host buat/join room.
+2. Host buka player musik bawah.
+3. Cari lagu, contoh: `The Cure Boys Don't Cry`.
+4. Pilih hasil YouTube.
+5. Klik tombol `Room` pada lagu, atau pilih lagu lalu klik `Putar ke Room`.
+6. Pemain lain tekan `Aktifkan di HP` jika lagu belum terdengar.
 
-## Catatan musik
-
-YouTube diputar lewat embedded YouTube player, bukan download audio. Beberapa video bisa menolak embed, jadi pilih hasil lain kalau error.
-Spotify full-track tidak dimasukkan karena butuh akun Premium/token dan tidak bisa langsung diputar bebas di web.
+Catatan: lagu lokal dari perangkat tidak bisa diputar bersama karena file hanya ada di perangkat masing-masing. Gunakan YouTube/Preview/Radio untuk musik bersama.

@@ -148,12 +148,24 @@
           <button id="musicTabOnline" class="music-tab" type="button">Preview</button>
           <button id="musicTabRadio" class="music-tab" type="button">Radio</button>
         </div>
+        <div id="roomMusicBar" class="room-music-bar hidden">
+          <div>
+            <b>Musik Bersama</b>
+            <span id="roomMusicInfo">Belum ada musik room.</span>
+          </div>
+          <div class="room-music-actions">
+            <button id="enableRoomMusic" class="upload-song primary-music" type="button">Aktifkan di HP</button>
+            <button id="shareRoomMusic" class="upload-song primary-music" type="button">Putar ke Room</button>
+            <button id="pauseRoomMusic" class="upload-song" type="button">Pause Room</button>
+            <button id="stopRoomMusic" class="upload-song danger-music" type="button">Stop Room</button>
+          </div>
+        </div>
         <div id="ytPlayerBox" class="yt-player-box hidden">
           <div class="yt-player-head"><span>▶ YouTube Player</span><button id="ytHideBtn" type="button">Sembunyikan</button></div>
           <div id="ytPlayerMount"></div>
         </div>
         <div id="musicList" class="music-list"></div>
-        <div class="music-note">Cari YouTube akan menampilkan pilihan lagu/video seperti search music. Pemutaran dilakukan lewat embedded YouTube player resmi. Preview memakai iTunes/Apple Music ±30 detik, Radio memakai stream publik, dan Lokal memakai file dari perangkat.</div>
+        <div class="music-note">Host bisa klik <b>Putar ke Room</b> agar lagu terdengar bersama. Di HP, pemain perlu menekan <b>Aktifkan di HP</b> satu kali karena browser sering memblokir audio otomatis. YouTube diputar lewat embedded player resmi; jika video menolak embed, pilih hasil lain.</div>
       </div>
     </section>
 

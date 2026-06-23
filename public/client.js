@@ -244,6 +244,7 @@ function renderAll() {
   renderPlayers();
   renderActions();
   renderLogs();
+  if (window.refreshRoomMusicControls) window.refreshRoomMusicControls();
 }
 
 function renderTimer() {
@@ -535,7 +536,7 @@ window.addEventListener('beforeunload', () => {
   if (localStream) leaveVoice();
 });
 
-// Online Music Player: built-in synth + YouTube embed search + iTunes previews + public internet radio + local audio upload.
+// Online Music Player: built-in synth + YouTube search/embed + iTunes previews + public radio + local upload + host-shared room music.
 (() => {
   const musicEls = {
     player: document.getElementById('musicPlayer'),
@@ -557,7 +558,13 @@ window.addEventListener('beforeunload', () => {
     tabRadio: document.getElementById('musicTabRadio'),
     ytBox: document.getElementById('ytPlayerBox'),
     ytMount: document.getElementById('ytPlayerMount'),
-    ytHide: document.getElementById('ytHideBtn')
+    ytHide: document.getElementById('ytHideBtn'),
+    roomBar: document.getElementById('roomMusicBar'),
+    roomInfo: document.getElementById('roomMusicInfo'),
+    enableRoom: document.getElementById('enableRoomMusic'),
+    shareRoom: document.getElementById('shareRoomMusic'),
+    pauseRoom: document.getElementById('pauseRoomMusic'),
+    stopRoom: document.getElementById('stopRoomMusic')
   };
   if (!musicEls.player) return;
 
@@ -583,10 +590,16 @@ window.addEventListener('beforeunload', () => {
     step: 0,
     audio: null,
     ytPlayer: null,
+    ytReady: false,
+    ytReadyPromise: null,
     ytApiPromise: null,
     currentYoutubeId: null,
     tab: 'all',
-    loading: false
+    loading: false,
+    roomMusic: null,
+    roomMusicKey: '',
+    roomActivated: false,
+    applyingShared: false
   };
 
   const savedVolume = Number(localStorage.getItem('ryuuMusicVolume') || 45);
@@ -615,9 +628,7 @@ window.addEventListener('beforeunload', () => {
     try { if (musicState.ytPlayer?.setVolume) musicState.ytPlayer.setVolume(Math.round(v * 100)); } catch {}
   }
 
-  function noteFreq(root, semi) {
-    return root * Math.pow(2, semi / 12);
-  }
+  function noteFreq(root, semi) { return root * Math.pow(2, semi / 12); }
 
   function scheduleSynthNote(song) {
     if (!musicState.ctx || !musicState.gain) return;
@@ -625,7 +636,6 @@ window.addEventListener('beforeunload', () => {
     const stepDuration = 60 / song.bpm / 2;
     const semi = song.pattern[musicState.step % song.pattern.length];
     const freq = noteFreq(song.root, semi);
-
     const osc = musicState.ctx.createOscillator();
     const env = musicState.ctx.createGain();
     osc.type = song.wave || 'triangle';
@@ -633,11 +643,8 @@ window.addEventListener('beforeunload', () => {
     env.gain.setValueAtTime(0.0001, now);
     env.gain.exponentialRampToValueAtTime(0.34, now + 0.018);
     env.gain.exponentialRampToValueAtTime(0.0001, now + Math.max(0.08, stepDuration * 0.86));
-    osc.connect(env);
-    env.connect(musicState.filter);
-    osc.start(now);
-    osc.stop(now + stepDuration);
-
+    osc.connect(env); env.connect(musicState.filter);
+    osc.start(now); osc.stop(now + stepDuration);
     if (musicState.step % 4 === 0) {
       const bass = musicState.ctx.createOscillator();
       const bassEnv = musicState.ctx.createGain();
@@ -646,12 +653,9 @@ window.addEventListener('beforeunload', () => {
       bassEnv.gain.setValueAtTime(0.0001, now);
       bassEnv.gain.exponentialRampToValueAtTime(0.26, now + 0.02);
       bassEnv.gain.exponentialRampToValueAtTime(0.0001, now + stepDuration * 1.7);
-      bass.connect(bassEnv);
-      bassEnv.connect(musicState.gain);
-      bass.start(now);
-      bass.stop(now + stepDuration * 1.8);
+      bass.connect(bassEnv); bassEnv.connect(musicState.gain);
+      bass.start(now); bass.stop(now + stepDuration * 1.8);
     }
-
     musicState.step += 1;
   }
 
@@ -670,8 +674,14 @@ window.addEventListener('beforeunload', () => {
     renderMusicList();
   }
 
-  async function playIndex(index) {
-    const song = musicState.songs[index];
+  function normalizeSongForPlayback(song) {
+    if (!song) return null;
+    if (song.source === 'built-in') return builtInSongs.find(x => x.id === song.id) || song;
+    return song;
+  }
+
+  async function playIndex(index, opts = {}) {
+    const song = normalizeSongForPlayback(musicState.songs[index]);
     if (!song) return;
     stopCurrent(true);
     musicState.index = index;
@@ -681,7 +691,7 @@ window.addEventListener('beforeunload', () => {
     renderMusicList();
 
     if (song.source === 'youtube' && song.videoId) {
-      await playYouTube(song);
+      await playYouTube(song, opts.startSec || 0);
       return;
     }
 
@@ -691,21 +701,26 @@ window.addEventListener('beforeunload', () => {
       audio.loop = song.source === 'local' || song.source === 'radio';
       audio.playsInline = true;
       audio.preload = 'auto';
+      if (opts.startSec) audio.currentTime = Math.max(0, Number(opts.startSec || 0));
       musicState.audio = audio;
       applyVolume();
-      audio.addEventListener('ended', () => {
-        if (song.source === 'online') move(1);
-      });
-      audio.addEventListener('error', () => {
-        toast('Music error', 'Stream/preview tidak bisa diputar. Coba lagu lain.');
-        stopCurrent();
-      });
+      audio.addEventListener('ended', () => { if (song.source === 'online') move(1); });
+      audio.addEventListener('error', () => { toast('Music error', 'Stream/preview tidak bisa diputar. Coba lagu lain.'); stopCurrent(); });
       try { await audio.play(); }
-      catch { toast('Music gagal', 'Browser menolak autoplay. Tekan tombol play sekali lagi.'); stopCurrent(); }
+      catch {
+        musicState.playing = false;
+        musicEls.play.textContent = '▶';
+        musicEls.player.classList.add('needs-tap');
+        toast('HP memblokir audio', 'Tekan tombol ▶ atau Aktifkan di HP sekali lagi.');
+      }
       return;
     }
 
     ensureAudio();
+    if (opts.startSec && song.bpm) {
+      const stepDuration = 60 / song.bpm / 2;
+      musicState.step = Math.floor(Number(opts.startSec || 0) / stepDuration);
+    }
     const stepMs = (60 / song.bpm / 2) * 1000;
     scheduleSynthNote(song);
     musicState.timer = setInterval(() => scheduleSynthNote(song), stepMs);
@@ -713,6 +728,8 @@ window.addEventListener('beforeunload', () => {
 
   function togglePlay() {
     if (musicState.playing) return stopCurrent();
+    musicState.roomActivated = true;
+    musicEls.player.classList.remove('needs-tap');
     playIndex(musicState.index);
   }
 
@@ -721,6 +738,7 @@ window.addEventListener('beforeunload', () => {
     if (!visible.length) return;
     const pos = visible.indexOf(musicState.index);
     const nextPos = pos >= 0 ? (pos + delta + visible.length) % visible.length : 0;
+    musicState.roomActivated = true;
     playIndex(visible[nextPos]);
   }
 
@@ -762,20 +780,32 @@ window.addEventListener('beforeunload', () => {
     musicEls.list.innerHTML = musicState.filtered.map(({ song, index }) => {
       const active = index === musicState.index;
       const sourceLabel = song.source === 'youtube' ? 'YouTube' : song.source === 'online' ? 'Preview online' : song.source === 'radio' ? 'Internet radio' : song.source === 'local' ? 'Lokal' : 'Built-in';
+      const canShare = !!(me?.isHost && roomState?.code && song.source !== 'local');
       return `<div class="song-row ${active ? 'active' : ''} ${escapeHtml(song.source || '')}">
         <div class="song-art">${song.thumbnail ? `<img class="song-thumb" src="${escapeHtml(song.thumbnail)}" alt="" loading="lazy" />` : escapeHtml(song.emoji || '🎵')}</div>
         <div>
           <div class="song-name">${escapeHtml(song.title)}</div>
           <div class="song-meta">${escapeHtml(song.artist)} • ${sourceLabel}${song.duration ? ` • <span class="song-duration">${escapeHtml(song.duration)}</span>` : ''}${song.mood ? ' • ' + escapeHtml(song.mood) : ''}</div>
         </div>
-        <button class="song-play" data-song-index="${index}">${active && musicState.playing ? '⏸' : '▶'}</button>
+        <div class="song-actions">
+          ${canShare ? `<button class="song-room-play" data-room-song-index="${index}" title="Putar lagu ini untuk semua pemain">Room</button>` : ''}
+          <button class="song-play" data-song-index="${index}">${active && musicState.playing ? '⏸' : '▶'}</button>
+        </div>
       </div>`;
     }).join('');
     musicEls.list.querySelectorAll('[data-song-index]').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = Number(btn.dataset.songIndex);
+        musicState.roomActivated = true;
+        musicEls.player.classList.remove('needs-tap');
         if (idx === musicState.index && musicState.playing) stopCurrent();
         else playIndex(idx);
+      });
+    });
+    musicEls.list.querySelectorAll('[data-room-song-index]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.roomSongIndex);
+        shareSongToRoom(musicState.songs[idx], idx);
       });
     });
   }
@@ -805,64 +835,224 @@ window.addEventListener('beforeunload', () => {
         tag.onerror = () => reject(new Error('YouTube API gagal dimuat'));
         document.head.appendChild(tag);
       }
-      setTimeout(() => {
-        if (window.YT?.Player) resolve();
-      }, 2500);
+      setTimeout(() => { if (window.YT?.Player) resolve(); }, 2500);
     });
     return musicState.ytApiPromise;
   }
 
-  async function playYouTube(song) {
-    try {
-      await loadYouTubeApi();
-      musicEls.ytBox?.classList.remove('hidden');
-      const volume = Number(musicEls.volume.value || 45);
-
-      if (musicState.ytPlayer?.loadVideoById) {
-        musicState.ytPlayer.loadVideoById(song.videoId);
-        musicState.ytPlayer.setVolume?.(volume);
-        return;
-      }
-
-      musicState.ytPlayer = new YT.Player('ytPlayerMount', {
-        width: '100%',
-        height: '160',
-        videoId: song.videoId,
-        playerVars: {
-          autoplay: 1,
-          playsinline: 1,
-          rel: 0,
-          modestbranding: 1,
-          origin: window.location.origin
-        },
-        events: {
-          onReady: (event) => {
-            event.target.setVolume(volume);
-            event.target.playVideo();
+  async function ensureYouTubePlayer() {
+    await loadYouTubeApi();
+    if (musicState.ytPlayer && musicState.ytReady) return musicState.ytPlayer;
+    if (musicState.ytReadyPromise) return musicState.ytReadyPromise;
+    musicEls.ytBox?.classList.remove('hidden');
+    musicState.ytReadyPromise = new Promise((resolve, reject) => {
+      try {
+        musicState.ytPlayer = new YT.Player('ytPlayerMount', {
+          width: '100%',
+          height: '160',
+          playerVars: {
+            autoplay: 0,
+            playsinline: 1,
+            rel: 0,
+            modestbranding: 1,
+            enablejsapi: 1,
+            origin: window.location.origin
           },
-          onStateChange: (event) => {
-            if (event.data === YT.PlayerState.ENDED) move(1);
-            if (event.data === YT.PlayerState.PLAYING) {
-              musicState.playing = true;
-              musicEls.play.textContent = '⏸';
-              renderMusicList();
+          events: {
+            onReady: (event) => {
+              musicState.ytReady = true;
+              event.target.setVolume(Number(musicEls.volume.value || 45));
+              resolve(event.target);
+            },
+            onStateChange: (event) => {
+              if (event.data === YT.PlayerState.ENDED) move(1);
+              if (event.data === YT.PlayerState.PLAYING) {
+                musicState.playing = true;
+                musicEls.player.classList.remove('needs-tap');
+                musicEls.play.textContent = '⏸';
+                renderMusicList();
+              }
+              if (event.data === YT.PlayerState.PAUSED) {
+                musicState.playing = false;
+                musicEls.play.textContent = '▶';
+                renderMusicList();
+              }
+            },
+            onError: () => {
+              toast('YouTube error', 'Video ini tidak bisa diputar sebagai embed. Coba pilihan lain.');
+              stopCurrent();
             }
-            if (event.data === YT.PlayerState.PAUSED) {
-              musicState.playing = false;
-              musicEls.play.textContent = '▶';
-              renderMusicList();
-            }
-          },
-          onError: () => {
-            toast('YouTube error', 'Video ini tidak bisa diputar sebagai embed. Coba pilihan lain.');
-            stopCurrent();
           }
-        }
-      });
+        });
+      } catch (err) { reject(err); }
+    });
+    return musicState.ytReadyPromise;
+  }
+
+  async function playYouTube(song, startSec = 0) {
+    try {
+      const player = await ensureYouTubePlayer();
+      musicEls.ytBox?.classList.remove('hidden');
+      applyVolume();
+      musicState.currentYoutubeId = song.videoId;
+      player.loadVideoById({ videoId: song.videoId, startSeconds: Math.max(0, Number(startSec || 0)) });
+      setTimeout(() => {
+        try { player.playVideo(); } catch {}
+      }, 80);
+      setTimeout(() => {
+        try {
+          const state = player.getPlayerState?.();
+          if (musicState.playing && state !== YT.PlayerState.PLAYING) {
+            musicEls.player.classList.add('needs-tap');
+            toast('Tekan aktifkan di HP', 'Kalau lagu belum bunyi, tekan tombol Aktifkan di HP atau tombol play di player YouTube.');
+          }
+        } catch {}
+      }, 1800);
     } catch (err) {
-      toast('YouTube gagal', 'Player YouTube gagal dimuat. Coba refresh atau lagu lain.');
+      toast('YouTube gagal', 'Player YouTube gagal dimuat. Refresh atau pilih lagu lain.');
       stopCurrent();
     }
+  }
+
+  function getCurrentMusicPositionSec() {
+    try {
+      if (musicState.ytPlayer?.getCurrentTime) return Math.max(0, Number(musicState.ytPlayer.getCurrentTime() || 0));
+    } catch {}
+    try { if (musicState.audio) return Math.max(0, Number(musicState.audio.currentTime || 0)); } catch {}
+    return 0;
+  }
+
+  function songToShare(song) {
+    if (!song || song.source === 'local') return null;
+    const base = {
+      source: song.source,
+      id: song.id,
+      emoji: song.emoji,
+      title: song.title,
+      artist: song.artist,
+      mood: song.mood,
+      duration: song.duration,
+      thumbnail: song.thumbnail
+    };
+    if (song.source === 'youtube') return { ...base, videoId: song.videoId, watchUrl: song.watchUrl };
+    if (song.source === 'online' || song.source === 'radio') return { ...base, url: song.url };
+    return base;
+  }
+
+  function shareSongToRoom(song, index = musicState.index) {
+    if (!me?.isHost || !roomState?.code) return toast('Host only', 'Hanya host room yang bisa memutar musik bersama.');
+    const share = songToShare(song);
+    if (!share) return toast('Tidak bisa dishare', 'Lagu lokal hanya bisa didengar di perangkatmu sendiri. Pakai YouTube/Preview/Radio untuk musik bersama.');
+    musicState.roomActivated = true;
+    musicEls.player.classList.remove('needs-tap');
+    musicState.index = index;
+    playIndex(index);
+    socket.emit('music:room-play', { song: share, positionSec: 0 }, (res) => {
+      if (!res?.ok) return toast('Gagal musik room', res?.error || 'Coba lagi.');
+      toast('Musik bersama', 'Lagu dikirim ke semua pemain di room.');
+    });
+  }
+
+  function pauseRoomMusic() {
+    if (!me?.isHost) return;
+    socket.emit('music:room-pause', { positionSec: getCurrentMusicPositionSec() }, (res) => {
+      if (!res?.ok) return toast('Gagal pause', res?.error || 'Coba lagi.');
+      stopCurrent();
+    });
+  }
+
+  function stopRoomMusic() {
+    if (!me?.isHost) return;
+    socket.emit('music:room-stop', {}, (res) => {
+      if (!res?.ok) return toast('Gagal stop', res?.error || 'Coba lagi.');
+      stopCurrent();
+    });
+  }
+
+  function musicKey(state) {
+    if (!state) return 'none';
+    return `${state.status}|${state.song?.id || state.song?.videoId || state.song?.url || ''}|${state.startedAt || ''}|${Math.floor(Number(state.positionSec || 0))}|${state.updatedAt || ''}`;
+  }
+
+  function calcSharedStartSec(state) {
+    let sec = Number(state?.positionSec || 0);
+    if (state?.status === 'playing' && state.startedAt) sec += Math.max(0, (Date.now() - Number(state.startedAt)) / 1000);
+    return sec;
+  }
+
+  function findOrAddSharedSong(song) {
+    if (!song) return -1;
+    const id = song.id || song.videoId || song.url;
+    let idx = musicState.songs.findIndex(s => (s.id || s.videoId || s.url) === id && s.source === song.source);
+    if (idx >= 0) return idx;
+    const playable = normalizeSongForPlayback(song);
+    musicState.songs.push(playable);
+    return musicState.songs.length - 1;
+  }
+
+  async function applyRoomMusic(state, force = false) {
+    if (!state?.song || state.status === 'stopped') {
+      if (force) stopCurrent();
+      return;
+    }
+    const idx = findOrAddSharedSong(state.song);
+    if (idx < 0) return;
+    if (state.status === 'paused') {
+      stopCurrent();
+      musicState.index = idx;
+      musicEls.title.textContent = `${state.song.title} — ${state.song.artist}`;
+      return;
+    }
+    if (state.status === 'playing') {
+      if (!musicState.roomActivated && !force) {
+        musicEls.player.classList.add('needs-tap');
+        renderRoomMusicControls();
+        return;
+      }
+      musicState.applyingShared = true;
+      await playIndex(idx, { startSec: calcSharedStartSec(state) });
+      musicState.applyingShared = false;
+    }
+  }
+
+  function receiveRoomMusic(state, source = 'socket') {
+    musicState.roomMusic = state || null;
+    const key = musicKey(state);
+    const changed = key !== musicState.roomMusicKey;
+    if (changed) musicState.roomMusicKey = key;
+    renderRoomMusicControls();
+    if (!state || !changed) return;
+    if (state.status === 'stopped') return stopCurrent();
+    if (state.status === 'playing') applyRoomMusic(state, false);
+    if (state.status === 'paused') stopCurrent();
+  }
+
+  function renderRoomMusicControls() {
+    const inRoom = !!roomState?.code;
+    const state = musicState.roomMusic || roomState?.music || null;
+    musicEls.roomBar?.classList.toggle('hidden', !inRoom);
+    const isHost = !!me?.isHost;
+    if (musicEls.shareRoom) musicEls.shareRoom.classList.toggle('hidden', !isHost);
+    if (musicEls.pauseRoom) musicEls.pauseRoom.classList.toggle('hidden', !isHost);
+    if (musicEls.stopRoom) musicEls.stopRoom.classList.toggle('hidden', !isHost);
+    if (musicEls.enableRoom) {
+      musicEls.enableRoom.classList.toggle('hidden', !(state?.song && state.status !== 'stopped'));
+      musicEls.enableRoom.textContent = musicState.roomActivated ? 'Sync Sekarang' : 'Aktifkan di HP';
+    }
+    if (musicEls.roomInfo) {
+      if (!state?.song || state.status === 'stopped') musicEls.roomInfo.textContent = isHost ? 'Pilih lagu lalu tekan Room / Putar ke Room agar terdengar bersama.' : 'Belum ada musik bersama dari host.';
+      else musicEls.roomInfo.textContent = `${state.status === 'paused' ? 'Pause' : 'Playing'}: ${state.song.title} — ${state.song.artist}${state.by ? ` • host: ${state.by}` : ''}`;
+    }
+    renderMusicList();
+  }
+
+  function enableRoomMusic() {
+    musicState.roomActivated = true;
+    musicEls.player.classList.remove('needs-tap');
+    const state = musicState.roomMusic || roomState?.music;
+    if (!state?.song) return toast('Belum ada musik', 'Host belum memutar musik bersama.');
+    applyRoomMusic(state, true);
+    toast('Musik aktif', 'HP kamu sudah diizinkan memutar audio room.');
   }
 
   async function searchYouTube() {
@@ -965,9 +1155,7 @@ window.addEventListener('beforeunload', () => {
   musicEls.next.addEventListener('click', () => move(1));
   musicEls.volume.addEventListener('input', applyVolume);
   musicEls.search.addEventListener('input', renderMusicList);
-  musicEls.search.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') searchYouTube();
-  });
+  musicEls.search.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchYouTube(); });
   musicEls.youtubeSearch?.addEventListener('click', searchYouTube);
   musicEls.onlineSearch?.addEventListener('click', searchOnline);
   musicEls.radioSearch?.addEventListener('click', searchRadio);
@@ -976,6 +1164,10 @@ window.addEventListener('beforeunload', () => {
   musicEls.tabYoutube?.addEventListener('click', () => setTab('youtube'));
   musicEls.tabOnline?.addEventListener('click', () => setTab('online'));
   musicEls.tabRadio?.addEventListener('click', () => setTab('radio'));
+  musicEls.enableRoom?.addEventListener('click', enableRoomMusic);
+  musicEls.shareRoom?.addEventListener('click', () => shareSongToRoom(musicState.songs[musicState.index], musicState.index));
+  musicEls.pauseRoom?.addEventListener('click', pauseRoomMusic);
+  musicEls.stopRoom?.addEventListener('click', stopRoomMusic);
   musicEls.upload.addEventListener('change', () => {
     const files = [...musicEls.upload.files || []].filter(f => f.type.startsWith('audio/'));
     for (const file of files) {
@@ -991,7 +1183,12 @@ window.addEventListener('beforeunload', () => {
     }
     musicEls.upload.value = '';
     renderMusicList();
-    if (files.length) toast('Playlist ditambah', `${files.length} lagu lokal masuk playlist.`);
+    if (files.length) toast('Playlist ditambah', `${files.length} lagu lokal masuk playlist. Lagu lokal tidak bisa diputar bersama.`);
+  });
+
+  socket.on('music:room-state', (state) => receiveRoomMusic(state, 'socket'));
+  socket.on('connect', () => {
+    if (roomState?.code) socket.emit('music:room-request');
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -999,6 +1196,17 @@ window.addEventListener('beforeunload', () => {
     if (!document.hidden && musicState.playing && musicState.ctx) musicState.ctx.resume?.();
   });
 
+  // Preload the official YouTube API early. On mobile, the user still has to tap once
+  // before audible playback is allowed, but this makes that first tap much more reliable.
+  loadYouTubeApi().catch(() => null);
+
+  window.refreshRoomMusicControls = () => {
+    const state = roomState?.music || null;
+    if (state) receiveRoomMusic(state, 'room-state');
+    else renderRoomMusicControls();
+  };
+
   renderMusicList();
+  renderRoomMusicControls();
   musicEls.title.textContent = `${musicState.songs[0].title} — ${musicState.songs[0].artist}`;
 })();
