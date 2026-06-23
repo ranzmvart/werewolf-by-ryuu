@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Werewolf Online Final</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <main class="app">
+    <section id="screenHome" class="screen active">
+      <div class="hero-card">
+        <div class="badge">Realtime Multiplayer Web Game</div>
+        <h1>🐺 Werewolf Online</h1>
+        <p class="subtitle">Buat room, ajak teman, dapatkan role rahasia dengan animasi, pilih Kepala Desa, voice bareng, diskusi, voting, dan cari Werewolf sebelum desa kalah.</p>
+
+        <div class="grid two">
+          <div class="panel">
+            <h2>Buat Room</h2>
+            <label>Nama Kamu</label>
+            <input id="createName" maxlength="18" placeholder="Contoh: Ryuu" />
+            <button id="btnCreate" class="primary">Buat Room Baru</button>
+          </div>
+
+          <div class="panel">
+            <h2>Masuk Room</h2>
+            <label>Nama Kamu</label>
+            <input id="joinName" maxlength="18" placeholder="Contoh: Denji" />
+            <label>Kode Room</label>
+            <input id="joinCode" maxlength="5" placeholder="ABCDE" class="code-input" />
+            <button id="btnJoin">Join Room</button>
+          </div>
+        </div>
+
+        <button id="btnReconnect" class="ghost hidden">Reconnect ke Room Terakhir</button>
+        <p class="tiny">Tip: voice chat butuh browser modern. Untuk HP/online hosting, gunakan HTTPS agar izin mikrofon aktif.</p>
+      </div>
+    </section>
+
+    <section id="screenGame" class="screen">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Room Code</div>
+          <div id="roomCode" class="room-code">-----</div>
+        </div>
+        <div class="phase-box">
+          <div id="phaseName" class="phase-name">Lobby</div>
+          <div id="timer" class="timer">--:--</div>
+        </div>
+        <div class="top-actions">
+          <button id="btnCopy" class="small">Copy Kode</button>
+          <button id="btnLeave" class="small danger">Keluar</button>
+        </div>
+      </header>
+
+      <section id="narratorPanel" class="narrator-panel">
+        <div class="narrator-icon">📜</div>
+        <div>
+          <div class="eyebrow">Narator</div>
+          <div id="narrationText" class="narration-text">Menunggu game dimulai...</div>
+        </div>
+        <label class="speech-toggle"><input id="speechToggle" type="checkbox" /> Suara narasi</label>
+      </section>
+
+      <section id="lobbyPanel" class="panel lobby-panel">
+        <div class="section-head">
+          <div>
+            <h2>Lobby</h2>
+            <p>Bagikan kode room ke teman. Host bisa mengatur role dan timer.</p>
+          </div>
+          <button id="btnReady" class="small">Ready</button>
+        </div>
+
+        <div id="hostSettings" class="settings hidden">
+          <div class="settings-head">
+            <h3>Pengaturan Host</h3>
+            <label class="toggle"><input id="autoPreset" type="checkbox" checked /> Auto role preset</label>
+          </div>
+          <div class="settings-grid">
+            <label>Werewolf <input id="werewolfCount" type="number" min="1" max="6" /></label>
+            <label>Seer <input id="seerCount" type="number" min="0" max="1" /></label>
+            <label>Doctor <input id="doctorCount" type="number" min="0" max="1" /></label>
+            <label>Hunter <input id="hunterCount" type="number" min="0" max="1" /></label>
+            <label>Kades/detik <input id="mayorSeconds" type="number" min="15" max="180" /></label>
+            <label>Malam/detik <input id="nightSeconds" type="number" min="20" max="300" /></label>
+            <label>Siang/detik <input id="daySeconds" type="number" min="30" max="600" /></label>
+            <label>Voting/detik <input id="voteSeconds" type="number" min="20" max="300" /></label>
+            <label>Hunter/detik <input id="hunterSeconds" type="number" min="10" max="120" /></label>
+          </div>
+          <div class="host-buttons">
+            <button id="btnSaveSettings">Simpan Setting</button>
+            <button id="btnStart" class="primary">Mulai Game</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="game-grid">
+        <aside class="panel role-panel">
+          <h2>Role Kamu</h2>
+          <div id="roleCard" class="role-card unknown">
+            <div class="role-emoji">❔</div>
+            <div>
+              <h3>Belum dibagikan</h3>
+              <p>Tunggu host memulai game.</p>
+            </div>
+          </div>
+
+          <div id="actionPanel" class="action-panel"></div>
+
+          <div class="voice-panel">
+            <div class="section-head mini-head">
+              <div>
+                <h3>Voice Room</h3>
+                <p id="voiceStatus">Belum masuk voice.</p>
+              </div>
+            </div>
+            <div class="voice-actions">
+              <button id="btnJoinVoice" class="small primary">Join Voice</button>
+              <button id="btnMuteVoice" class="small hidden">Mute</button>
+              <button id="btnLeaveVoice" class="small danger hidden">Leave</button>
+            </div>
+            <div id="voiceList" class="voice-list"></div>
+            <div id="remoteAudios" class="remote-audios"></div>
+          </div>
+
+          <div id="hostControls" class="host-controls hidden">
+            <h3>Host Control</h3>
+            <button id="btnSkip" class="small">Skip Fase</button>
+            <button id="btnReset" class="small danger">Reset ke Lobby</button>
+          </div>
+        </aside>
+
+        <section class="panel players-panel">
+          <div class="section-head">
+            <div>
+              <h2>Pemain</h2>
+              <p id="aliveInfo">0 pemain</p>
+            </div>
+          </div>
+          <div id="playersList" class="players-list"></div>
+        </section>
+
+        <section class="panel chat-panel">
+          <div class="section-head">
+            <div>
+              <h2>Chat & Log</h2>
+              <p id="chatHint">Chat publik aktif saat lobby/siang/voting.</p>
+            </div>
+            <select id="chatChannel">
+              <option value="public">Public</option>
+              <option value="wolf">Werewolf</option>
+            </select>
+          </div>
+          <div id="messages" class="messages"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" maxlength="300" placeholder="Tulis pesan..." />
+            <button>Kirim</button>
+          </form>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div id="roleRevealOverlay" class="role-reveal-overlay hidden">
+    <div id="roleRevealCard" class="role-reveal-card">
+      <div class="reveal-top">ROLE KAMU</div>
+      <div id="revealEmoji" class="reveal-emoji">❔</div>
+      <h2 id="revealName">Unknown</h2>
+      <p id="revealDesc">Role belum tersedia.</p>
+      <button id="btnCloseReveal" class="primary">Saya Mengerti</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
