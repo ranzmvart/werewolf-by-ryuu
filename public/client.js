@@ -536,7 +536,7 @@ window.addEventListener('beforeunload', () => {
   if (localStream) leaveVoice();
 });
 
-// Online Music Player: built-in synth + YouTube search/embed + iTunes previews + public radio + local upload + host-shared room music.
+// Online Music Player: YouTube search/embed + iTunes previews + public radio + local upload + host-shared room music. Built-in playlist removed.
 (() => {
   const musicEls = {
     player: document.getElementById('musicPlayer'),
@@ -568,18 +568,10 @@ window.addEventListener('beforeunload', () => {
   };
   if (!musicEls.player) return;
 
-  const builtInSongs = [
-    { source:'built-in', id:'moon-run', emoji:'🌙', title:'Moon Run', artist:'Ryuu Radio', mood:'dark chase', bpm:112, wave:'triangle', root:220, pattern:[0,3,7,10,7,3,5,2,0,3,7,12,10,7,5,3] },
-    { source:'built-in', id:'village-dawn', emoji:'🌅', title:'Village Dawn', artist:'Ryuu Radio', mood:'calm village', bpm:86, wave:'sine', root:196, pattern:[0,4,7,11,7,4,2,4,0,4,7,12,11,7,4,2] },
-    { source:'built-in', id:'wolf-hunt', emoji:'🐺', title:'Wolf Hunt', artist:'Ryuu Radio', mood:'intense night', bpm:128, wave:'sawtooth', root:130.81, pattern:[0,0,3,0,7,0,10,7,0,0,3,0,12,10,7,3] },
-    { source:'built-in', id:'seer-vision', emoji:'🔮', title:'Seer Vision', artist:'Ryuu Radio', mood:'mystic focus', bpm:96, wave:'triangle', root:246.94, pattern:[0,7,12,14,12,7,5,7,0,7,11,14,12,7,5,2] },
-    { source:'built-in', id:'doctor-pulse', emoji:'💉', title:'Doctor Pulse', artist:'Ryuu Radio', mood:'soft focus', bpm:100, wave:'sine', root:174.61, pattern:[0,5,9,12,9,5,4,5,0,5,9,14,12,9,5,4] },
-    { source:'built-in', id:'final-vote', emoji:'🗳️', title:'Final Vote', artist:'Ryuu Radio', mood:'tense voting', bpm:118, wave:'square', root:164.81, pattern:[0,2,3,7,3,2,0,-2,0,2,5,8,7,5,3,2] },
-    { source:'built-in', id:'victory-fire', emoji:'🏆', title:'Victory Fire', artist:'Ryuu Radio', mood:'win energy', bpm:122, wave:'triangle', root:261.63, pattern:[0,4,7,12,7,4,7,12,0,4,9,12,16,12,9,7] }
-  ];
+  const builtInSongs = [];
 
   const musicState = {
-    songs: [...builtInSongs],
+    songs: [],
     filtered: [],
     index: 0,
     playing: false,
@@ -779,7 +771,7 @@ window.addEventListener('beforeunload', () => {
     }
     musicEls.list.innerHTML = musicState.filtered.map(({ song, index }) => {
       const active = index === musicState.index;
-      const sourceLabel = song.source === 'youtube' ? 'YouTube' : song.source === 'online' ? 'Preview online' : song.source === 'radio' ? 'Internet radio' : song.source === 'local' ? 'Lokal' : 'Built-in';
+      const sourceLabel = song.source === 'youtube' ? 'YouTube' : song.source === 'online' ? 'Preview online' : song.source === 'radio' ? 'Internet radio' : song.source === 'local' ? 'Lokal' : 'Online';
       const canShare = !!(me?.isHost && roomState?.code && song.source !== 'local');
       return `<div class="song-row ${active ? 'active' : ''} ${escapeHtml(song.source || '')}">
         <div class="song-art">${song.thumbnail ? `<img class="song-thumb" src="${escapeHtml(song.thumbnail)}" alt="" loading="lazy" />` : escapeHtml(song.emoji || '🎵')}</div>
@@ -1208,5 +1200,5 @@ window.addEventListener('beforeunload', () => {
 
   renderMusicList();
   renderRoomMusicControls();
-  musicEls.title.textContent = `${musicState.songs[0].title} — ${musicState.songs[0].artist}`;
+  musicEls.title.textContent = 'Cari lagu untuk mulai';
 })();

@@ -131,7 +131,7 @@ function publicMusic(music = {}) {
 
 function sanitizeMusicSong(song = {}) {
   const source = String(song.source || '').slice(0, 20);
-  const allowed = new Set(['youtube', 'online', 'radio', 'built-in']);
+  const allowed = new Set(['youtube', 'online', 'radio']);
   if (!allowed.has(source)) return null;
   const safe = {
     source,
@@ -154,10 +154,6 @@ function sanitizeMusicSong(song = {}) {
     const url = String(song.url || '');
     if (!/^https?:\/\//i.test(url)) return null;
     safe.url = url.slice(0, 600);
-    return safe;
-  }
-  if (source === 'built-in') {
-    // Built-in synth metadata is safe to share, clients already have the song by id.
     return safe;
   }
   return null;
