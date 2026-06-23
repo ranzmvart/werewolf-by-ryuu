@@ -17,7 +17,10 @@ const ROLE_META = {
   Jester: { team:'jester', emoji:'🃏', aura:'pink', desc:'Menang sendiri jika berhasil dieliminasi voting.' },
   'Cursed Villager': { team:'village', emoji:'🌘', aura:'blood', desc:'Jika diserang Werewolf, berubah menjadi Werewolf sekali.' },
   Prince: { team:'village', emoji:'👑', aura:'amber', desc:'Sekali selamat dari eliminasi voting.' },
-  Priest: { team:'village', emoji:'⛪', aura:'blue', desc:'Sekali per game memberi Holy Shield saat malam.' }
+  Priest: { team:'village', emoji:'⛪', aura:'blue', desc:'Sekali per game memberi Holy Shield saat malam.' },
+  Lycan: { team:'village', emoji:'🐺🌾', aura:'blood', desc:'Warga yang terlihat seperti Werewolf jika diterawang Seer.' },
+  Sorcerer: { team:'werewolf', emoji:'🧙‍♂️', aura:'violet', desc:'Tim Werewolf yang ikut strategi dan dapat memilih target serangan.' },
+  'Tough Guy': { team:'village', emoji:'💪', aura:'amber', desc:'Warga kuat tanpa aksi aktif. Cocok untuk bluffing dan tahan tekanan.' }
 };
 
 let roomState = null;
@@ -28,6 +31,9 @@ let selectedActionType = 'heal';
 let localStream = null;
 let muted = false;
 const peers = new Map();
+let accountProfile = null;
+let shopCatalog = [];
+let latestLeaderboards = null;
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -39,7 +45,8 @@ const els = {
   cinematic: $('cinematic'), cinematicIcon: $('cinematicIcon'), cinematicTitle: $('cinematicTitle'), cinematicText: $('cinematicText'), toastStack: $('toastStack'),
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
-  guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp')
+  guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
+  accountHub: $('accountHub'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox')
 };
 
 const savedName = localStorage.getItem('werewolfName');
@@ -129,7 +136,9 @@ function setConnectionStatus(type, text) {
 }
 
 els.createBtn.onclick = () => {
-  const name = els.nameInput.value.trim();
+  if (!accountProfile) return toast('Login dulu', 'Daftar atau login akun pemain sebelum membuat room.');
+  const name = accountProfile.username;
+  els.nameInput.value = name;
   if (!name) return toast('Nama belum diisi', 'Isi nama pemain dulu.');
   const roomName = els.roomNameInput?.value?.trim() || `${name}'s Room`;
   const password = els.roomPasswordInput?.value?.trim() || '';
@@ -143,7 +152,9 @@ els.createBtn.onclick = () => {
 };
 
 els.joinBtn.onclick = () => {
-  const name = els.nameInput.value.trim();
+  if (!accountProfile) return toast('Login dulu', 'Daftar atau login akun pemain sebelum join room.');
+  const name = accountProfile.username;
+  els.nameInput.value = name;
   const code = els.codeInput.value.trim().toUpperCase();
   if (!name || !code) return toast('Data belum lengkap', 'Isi nama dan kode room.');
   localStorage.setItem('werewolfName', name);
@@ -192,7 +203,9 @@ function renderRoomBrowser() {
 }
 
 window.joinListedRoom = (code, hasPassword) => {
-  const name = els.nameInput.value.trim();
+  if (!accountProfile) return toast('Login dulu', 'Daftar atau login akun pemain sebelum join lobby orang.');
+  const name = accountProfile.username;
+  els.nameInput.value = name;
   if (!name) return toast('Nama belum diisi', 'Isi nama pemain dulu sebelum join room.');
   let password = els.roomPasswordInput?.value?.trim() || '';
   if (hasPassword && !password) {
@@ -259,6 +272,7 @@ els.chatForm.onsubmit = (e) => {
 
 socket.on('connect', () => {
   setConnectionStatus('online', 'Online');
+  autoLoginAccount();
   requestRoomList(false);
   // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
   if (!els.game.classList.contains('hidden') && getSession()?.code) {
@@ -273,6 +287,25 @@ socket.on('connect_error', () => setConnectionStatus('offline', 'Koneksi gagal')
 socket.on('rooms:list', (rooms) => {
   latestRoomList = Array.isArray(rooms) ? rooms : [];
   renderRoomBrowser();
+});
+
+socket.on('shop:catalog', ({ shop, leaderboards } = {}) => {
+  if (Array.isArray(shop)) shopCatalog = shop;
+  if (leaderboards) latestLeaderboards = leaderboards;
+  renderAccountHub();
+});
+
+socket.on('profile:update', ({ profile, shop, leaderboards } = {}) => {
+  if (profile) accountProfile = profile;
+  if (Array.isArray(shop)) shopCatalog = shop;
+  if (leaderboards) latestLeaderboards = leaderboards;
+  renderAccountHub();
+});
+
+socket.on('reward:summary', ({ points, won, profile } = {}) => {
+  if (profile) accountProfile = profile;
+  renderAccountHub();
+  toast(won ? 'Reward kemenangan' : 'Reward partisipasi', `+${points || 0} poin ditambahkan ke profilmu.`);
 });
 
 socket.on('room:state', (state) => {
@@ -332,6 +365,7 @@ function renderAll() {
   renderPlayers();
   renderActions();
   renderLogs();
+  renderGameProfileBox();
   if (window.refreshRoomMusicControls) window.refreshRoomMusicControls();
 }
 
@@ -363,9 +397,11 @@ function renderRole() {
   }
   const meta = ROLE_META[me.role] || me.roleMeta || { emoji:'❔', aura:'', desc:'' };
   els.roleCard.className = `role-card ${meta.aura}`;
-  els.roleCard.innerHTML = `<div class="role-emoji">${meta.emoji}</div><div class="role-name">${escapeHtml(me.role)}</div><div class="role-desc">${escapeHtml(meta.desc)}</div>`;
+  els.roleCard.innerHTML = `<div class="role-emoji">${meta.emoji}</div><div class="role-name">${escapeHtml(me.role)}</div><div class="role-desc">${escapeHtml(meta.desc)}</div>${me.equippedPower ? `<div class="power-mini">⚡ Power aktif: ${escapeHtml(itemName(me.equippedPower))}</div>` : ''}`;
   const extra = [];
-  if (me.isMayor) extra.push('👑 Kamu adalah Kepala Desa. Vote kamu bernilai 2 suara.');
+  if (me.isMayor) extra.push(`👑 Kamu adalah Kepala Desa. Vote kamu bernilai ${me.voteWeight || 2} suara.`);
+  if (me.equippedPower) extra.push(`⚡ Power Item: ${itemName(me.equippedPower)}.`);
+  if (roomState?.phase === 'night' && Number.isFinite(me.remainingActions)) extra.push(`🌙 Sisa aksi malam: ${me.remainingActions}.`);
   if (me.lastInfo) extra.push(`🔎 ${me.lastInfo}`);
   if (me.role === 'Witch') extra.push(`🧪 Heal: ${me.witchHealUsed ? 'habis' : 'tersedia'} • Poison: ${me.witchPoisonUsed ? 'habis' : 'tersedia'}`);
   if (me.role === 'Priest') extra.push(`⛪ Holy Shield: ${me.priestBlessUsed ? 'habis' : 'tersedia'}`);
@@ -384,9 +420,12 @@ function renderPlayers() {
     const host = p.isHost ? '<span class="pill">Host</span>' : '';
     const voice = p.voice ? '<span class="pill">🎙️ Voice</span>' : '';
     const offline = !p.connected ? '<span class="pill offline-pill">Offline</span>' : '';
-    return `<div class="player ${p.alive ? '' : 'dead'} ${p.connected ? '' : 'offline'}">
-      <div class="avatar">${escapeHtml(initial)}</div>
-      <div><div class="p-name">${escapeHtml(p.name)}${p.id === me?.id ? ' (Kamu)' : ''}</div><div class="p-meta">${host}${mayor}${dead}${offline}${voice}${role}</div></div>
+    const badge = p.badge ? `<span class="pill">${escapeHtml(itemEmoji(p.badge))} ${escapeHtml(itemName(p.badge))}</span>` : '';
+    const power = p.power ? `<span class="pill">⚡ ${escapeHtml(itemName(p.power))}</span>` : '';
+    const avatar = p.avatar ? `<img class="avatar-img ${escapeHtml(frameClass(p.frame))}" src="${escapeHtml(p.avatar)}" alt="avatar">` : escapeHtml(initial);
+    return `<div class="player ${escapeHtml(p.skin || '')} ${p.alive ? '' : 'dead'} ${p.connected ? '' : 'offline'}">
+      <div class="avatar">${avatar}</div>
+      <div><div class="p-name">${escapeHtml(p.name)}${p.id === me?.id ? ' (Kamu)' : ''}</div><div class="p-meta">${host}${mayor}${dead}${offline}${voice}${role}${badge}${power}</div></div>
       ${me?.isHost && roomState.phase === 'lobby' && p.id !== me.id ? `<button class="btn danger small" onclick="kickPlayer('${p.id}')">Kick</button>` : ''}
     </div>`;
   }).join('');
@@ -413,26 +452,26 @@ function renderActions() {
     const role = me.role;
     const eventText = me.nightEvent ? ` Event: ${me.nightEvent.emoji} ${me.nightEvent.name}.` : '';
     if (me.actionDone) {
-      hint = 'Aksi malam kamu sudah terkunci. Tunggu sampai pagi.' + eventText;
+      hint = 'Aksi malam kamu sudah habis. Tunggu sampai pagi.' + eventText;
       buttons = [];
-    } else if (role === 'Werewolf' || role === 'Alpha Werewolf') {
-      hint = 'Werewolf: pilih 1 target untuk dibunuh. Setelah dipilih tidak bisa diganti.' + eventText;
+    } else if (role === 'Werewolf' || role === 'Alpha Werewolf' || role === 'Sorcerer') {
+      hint = `Werewolf: pilih target untuk dibunuh. Sisa aksi: ${me.remainingActions ?? 1}.` + eventText;
       const wolfIds = new Set(me.wolfTeamIds || []);
       buttons = aliveOthers.filter(p => !wolfIds.has(p.id)).map(p => actionButton(p, 'wolfKill'));
     } else if (role === 'Seer') {
-      hint = 'Seer: pilih 1 pemain untuk diterawang. Hanya 1 kali setiap malam.' + eventText;
+      hint = `Seer: pilih pemain untuk diterawang. Sisa terawangan: ${me.remainingActions ?? 1}.` + eventText;
       buttons = aliveOthers.map(p => actionButton(p, 'seer'));
     } else if (role === 'Doctor') {
-      hint = 'Doctor: pilih 1 pemain untuk dilindungi. Hanya 1 kali setiap malam.' + eventText;
+      hint = `Doctor: pilih pemain untuk dilindungi. Sisa protect: ${me.remainingActions ?? 1}.` + eventText;
       buttons = aliveTargets.map(p => actionButton(p, 'doctor'));
     } else if (role === 'Bodyguard') {
-      hint = 'Bodyguard: pilih 1 pemain lain untuk dijaga. Hanya 1 kali setiap malam.' + eventText;
+      hint = `Bodyguard: pilih pemain lain untuk dijaga. Sisa guard: ${me.remainingActions ?? 1}.` + eventText;
       buttons = aliveOthers.map(p => actionButton(p, 'guard'));
     } else if (role === 'Priest') {
       hint = me.priestBlessUsed ? 'Holy Shield kamu sudah habis.' : 'Priest: pilih 1 pemain untuk Holy Shield. Skill ini hanya sekali per game.' + eventText;
       if (!me.priestBlessUsed) buttons = aliveTargets.map(p => actionButton(p, 'priest'));
     } else if (role === 'Witch') {
-      hint = 'Witch: pilih ramuan dulu, lalu target. Hanya 1 ramuan per malam.' + eventText;
+      hint = `Witch: pilih ramuan dulu, lalu target. Sisa aksi malam: ${me.remainingActions ?? 1}.` + eventText;
       const controls = document.createElement('div');
       controls.className = 'voice-actions';
       controls.innerHTML = `<button class="btn secondary small" id="healMode" ${me.witchHealUsed ? 'disabled' : ''}>Heal</button><button class="btn secondary small" id="poisonMode" ${me.witchPoisonUsed ? 'disabled' : ''}>Poison</button>`;
@@ -454,7 +493,7 @@ function renderActions() {
   }
   if (roomState.phase === 'day') hint = 'Diskusikan siapa yang mencurigakan sebelum voting.';
   if (roomState.phase === 'voting' && me.alive) {
-    hint = me.isMayor ? 'Pilih target eliminasi. Kamu Kades, suara kamu bernilai 2.' : 'Pilih target eliminasi.';
+    hint = `Pilih target eliminasi. Suara kamu bernilai ${me.voteWeight || (me.isMayor ? 2 : 1)}.`;
     buttons = aliveOthers.map(p => actionButton(p, 'vote'));
   }
   if (roomState.phase === 'hunter' && me.role === 'Hunter' && !me.alive) {
@@ -532,6 +571,140 @@ function toast(title, text) {
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
+
+
+// Account, shop, inventory, leaderboard
+const AUTH_KEY = 'ryuuWerewolfAccountV3';
+let selectedAvatarData = '';
+let activeHubTab = 'shop';
+let activeLbTab = 'points';
+
+function itemById(id) { return shopCatalog.find(x => x.id === id) || null; }
+function itemName(id) { return itemById(id)?.name || id || '-'; }
+function itemEmoji(id) { return itemById(id)?.emoji || '🎁'; }
+function frameClass(id) { return itemById(id)?.className || ''; }
+function savedAuth() { try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch { return null; } }
+function saveAuth(username, pin) { localStorage.setItem(AUTH_KEY, JSON.stringify({ username, pin })); }
+
+function autoLoginAccount() {
+  const saved = savedAuth();
+  if (!saved?.username || !saved?.pin || accountProfile) return;
+  socket.emit('auth:login', saved, (res) => {
+    if (res?.ok) {
+      accountProfile = res.profile;
+      shopCatalog = res.shop || shopCatalog;
+      latestLeaderboards = res.leaderboards || latestLeaderboards;
+      renderAccountHub();
+    } else renderAccountHub();
+  });
+}
+
+els.avatarInput?.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (file.size > 350000) return toast('Foto terlalu besar', 'Gunakan gambar kecil di bawah 350 KB agar cepat disimpan.');
+  selectedAvatarData = await fileToDataUrl(file);
+  if (accountProfile) {
+    socket.emit('auth:avatar', { avatar: selectedAvatarData }, (res) => {
+      if (!res?.ok) return toast('Upload gagal', res?.error || 'Coba gambar lain.');
+      accountProfile = res.profile;
+      renderAccountHub();
+      toast('Avatar disimpan', 'Foto profil kamu berhasil diperbarui.');
+    });
+  } else toast('Avatar siap', 'Klik Daftar untuk memakai foto ini.');
+});
+function fileToDataUrl(file) { return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file); }); }
+
+els.registerBtn?.addEventListener('click', () => {
+  const username = els.authName.value.trim();
+  const pin = els.authPin.value.trim();
+  socket.emit('auth:register', { username, pin, avatar: selectedAvatarData }, (res) => {
+    if (!res?.ok) return toast('Daftar gagal', res?.error || 'Coba lagi.');
+    accountProfile = res.profile;
+    shopCatalog = res.shop || shopCatalog;
+    latestLeaderboards = res.leaderboards || latestLeaderboards;
+    saveAuth(username, pin);
+    els.nameInput.value = accountProfile.username;
+    renderAccountHub();
+    toast('Akun dibuat', `Selamat datang, ${accountProfile.username}. Bonus awal 500 poin.`);
+  });
+});
+els.loginBtn?.addEventListener('click', () => {
+  const username = els.authName.value.trim();
+  const pin = els.authPin.value.trim();
+  socket.emit('auth:login', { username, pin }, (res) => {
+    if (!res?.ok) return toast('Login gagal', res?.error || 'Coba lagi.');
+    accountProfile = res.profile;
+    shopCatalog = res.shop || shopCatalog;
+    latestLeaderboards = res.leaderboards || latestLeaderboards;
+    saveAuth(username, pin);
+    els.nameInput.value = accountProfile.username;
+    renderAccountHub();
+    toast('Login berhasil', `Masuk sebagai ${accountProfile.username}.`);
+  });
+});
+
+for (const [btn, tab] of [[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => { activeHubTab = tab; renderAccountHub(); });
+
+function renderAccountHub() {
+  if (!els.accountStatus) return;
+  const p = accountProfile;
+  els.accountStatus.textContent = p ? `Login: ${p.username}` : 'Belum login';
+  if (p) {
+    els.nameInput.value = p.username;
+    els.nameInput.disabled = true;
+    els.profileSummary?.classList.remove('hidden');
+    const s = p.stats || {};
+    const eq = p.equipped || {};
+    els.profileSummary.innerHTML = `<img class="profile-avatar ${escapeHtml(frameClass(eq.frame))}" src="${escapeHtml(p.avatar)}" alt="avatar"><div><div class="profile-name">${escapeHtml(p.username)} • ${p.points || 0} poin</div><div class="profile-stats"><span class="pill">🏆 ${s.wins || 0} Win</span><span class="pill">🎮 ${s.games || 0} Main</span><span class="pill">🐺 ${s.teamWins?.werewolf || 0} Wolf Win</span><span class="pill">🏡 ${s.teamWins?.village || 0} Village Win</span><span class="pill">🔥 Streak ${s.winStreak || 0}</span></div><div class="power-note">Equip: ${eq.skin ? itemName(eq.skin) : 'No skin'} • ${eq.frame ? itemName(eq.frame) : 'No frame'} • ${eq.badge ? itemName(eq.badge) : 'No badge'} • ${eq.power ? itemName(eq.power) : 'No power'}</div></div>`;
+  } else {
+    els.nameInput.disabled = false;
+    els.profileSummary?.classList.add('hidden');
+  }
+  for (const [btn, tab] of [[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.classList.toggle('active', activeHubTab === tab);
+  els.shopPanel?.classList.toggle('hidden', activeHubTab !== 'shop');
+  els.inventoryPanel?.classList.toggle('hidden', activeHubTab !== 'inv');
+  els.leaderboardPanel?.classList.toggle('hidden', activeHubTab !== 'lb');
+  renderShop(); renderInventory(); renderLeaderboard(); renderGameProfileBox();
+}
+
+function renderShop() {
+  if (!els.shopPanel) return;
+  if (!shopCatalog.length) { els.shopPanel.innerHTML = '<div class="mini-note">Shop belum dimuat.</div>'; return; }
+  const points = accountProfile?.points || 0;
+  els.shopPanel.innerHTML = `<div class="shop-grid">${shopCatalog.map(item => {
+    const owned = !!accountProfile?.inventory?.[item.id];
+    const equipped = accountProfile?.equipped?.[item.type] === item.id;
+    return `<div class="shop-item ${item.type}"><div class="shop-top"><div><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div><span class="badge">${item.type}</span></div><div class="shop-actions"><span class="price">${item.price} poin</span>${owned ? (equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`) : `<button class="btn primary small" ${points < item.price ? 'disabled' : ''} onclick="buyItem('${item.id}')">Beli</button>`}</div></div>`;
+  }).join('')}</div>`;
+}
+function renderInventory() {
+  if (!els.inventoryPanel) return;
+  const inv = accountProfile?.inventory || {};
+  const owned = shopCatalog.filter(x => inv[x.id]);
+  if (!accountProfile) { els.inventoryPanel.innerHTML = '<div class="mini-note">Login dulu untuk melihat inventory.</div>'; return; }
+  if (!owned.length) { els.inventoryPanel.innerHTML = '<div class="mini-note">Inventory kosong. Beli item di Shop.</div>'; return; }
+  els.inventoryPanel.innerHTML = `<div class="shop-grid">${owned.map(item => `<div class="shop-item ${item.type}"><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div><div class="shop-actions"><span class="owned">Dimiliki</span><button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button></div></div>`).join('')}</div>`;
+}
+function renderLeaderboard() {
+  if (!els.leaderboardPanel) return;
+  if (!latestLeaderboards) { els.leaderboardPanel.innerHTML = '<div class="mini-note">Leaderboard belum dimuat.</div>'; return; }
+  const tabs = [['points','Poin'],['overall','Overall'],['werewolf','Werewolf'],['village','Village'],['seer','Seer'],['doctor','Doctor']];
+  const list = latestLeaderboards[activeLbTab] || [];
+  els.leaderboardPanel.innerHTML = `<div class="leader-tabs">${tabs.map(([id,label]) => `<button onclick="setLbTab('${id}')" class="${activeLbTab===id?'active':''}">${label}</button>`).join('')}</div>${list.slice(0,100).map((u,i) => `<div class="leader-row"><div class="rank">#${i+1}</div><div><div class="leader-name">${escapeHtml(u.username)}</div><div class="leader-meta">Win ${u.stats?.wins || 0} • Main ${u.stats?.games || 0} • Wolf ${u.stats?.teamWins?.werewolf || 0} • Village ${u.stats?.teamWins?.village || 0}</div></div><b>${u.points || 0}</b></div>`).join('')}`;
+}
+window.setLbTab = (id) => { activeLbTab = id; renderLeaderboard(); };
+window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); toast('Item dibeli', `${res.item?.name || itemId} masuk inventory.`); });
+window.equipItem = (itemId) => socket.emit('shop:equip', { itemId }, (res) => { if (!res?.ok) return toast('Gagal equip', res?.error || 'Belum dimiliki.'); accountProfile = res.profile; renderAccountHub(); toast('Item dipakai', `${res.item?.name || itemId} sekarang aktif.`); });
+
+function renderGameProfileBox() {
+  if (!els.gameProfileBox) return;
+  if (!accountProfile) { els.gameProfileBox.classList.add('hidden'); return; }
+  const eq = accountProfile.equipped || {};
+  els.gameProfileBox.classList.remove('hidden');
+  els.gameProfileBox.innerHTML = `<b>👤 ${escapeHtml(accountProfile.username)}</b><div class="mini-note">${accountProfile.points || 0} poin • ${eq.power ? '⚡ '+escapeHtml(itemName(eq.power)) : 'Power belum dipakai'}</div>`;
+}
+renderAccountHub();
 
 // Voice WebRTC mesh
 const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };

@@ -1,26 +1,22 @@
-# Werewolf by Ryuu — Final Room Browser + Password Lobby
+# Werewolf by Ryuu v3.0 — Profile, Leaderboard, Points, Shop
 
-Versi final ini mempertahankan semua fitur sebelumnya: room realtime, voice WebRTC, reconnect, musik YouTube/search-only, musik bersama dari host, auto reset room, Kades vote x2, animasi role/menang/kalah/mati, guide, dan deploy Railway.
+Versi final upgrade dengan:
 
-## Update terbaru
+- Login & daftar memakai username unik + PIN.
+- Username yang sudah dipakai tidak bisa didaftarkan lagi.
+- Profil pemain dengan upload foto.
+- Badge, skin, frame/border foto, inventory, equip item.
+- Sistem poin setelah game selesai.
+- Leaderboard Top 100: poin, overall, team Werewolf, team Village, Seer, Doctor.
+- Power item: Seer 2x scan, Werewolf 2 target, vote 3 suara, Doctor 2 protect, Bodyguard 2 guard, Witch 2 ramuan/malam, Lucky Charm, Shadow Cloak.
+- Statistik menang/kalah, role win, team win, kill, scan, protect, vote.
+- Room list, password lobby, reconnect, musik bersama, YouTube search, voice, Kades x2, auto reset.
 
-- Lobby Publik ditambahkan di menu awal.
-- Pemain bisa melihat daftar room yang sudah dibuat.
-- Pemain bisa join room orang lain langsung dari list tanpa mengetik kode manual.
-- Host bisa memberi nama room.
-- Host bisa membuat room dengan password opsional.
-- Room berpassword muncul dengan ikon 🔒 dan tetap bisa di-join jika pemain tahu password.
-- Tombol Refresh daftar room ditambahkan.
-- Join manual pakai kode room tetap tersedia.
-- Seer tetap hanya bisa menerawang 1 pemain per malam.
-- Semua aksi malam role dikunci 1 kali per malam.
-- Musik bersama host, voice, reconnect, guide, role tambahan, dan auto reset tetap dipertahankan.
+## Deploy Railway
 
-## Struktur deploy Railway
+Struktur repo:
 
-Struktur repo harus langsung seperti ini:
-
-```text
+```txt
 werewolf-by-ryuu/
 ├── public/
 │   ├── index.html
@@ -33,28 +29,30 @@ werewolf-by-ryuu/
 └── server.js
 ```
 
-Jangan upload sebagai folder ganda.
+Railway akan memakai Dockerfile Node 22. Setelah push ke GitHub, Railway redeploy otomatis.
 
-Railway akan memakai Dockerfile Node 22. Setelah push ke GitHub, Railway akan redeploy otomatis.
+## Penting untuk data akun permanen
 
-## Cara main singkat
+Database pemain disimpan di:
 
-1. Isi nama pemain.
-2. Untuk host: isi nama room, opsional isi password, lalu klik Buat Room.
-3. Untuk pemain: pilih room dari Lobby Publik lalu klik Join. Kalau room terkunci, masukkan password.
-4. Pemain juga bisa join manual dengan kode room.
-5. Host klik Start Game.
-6. Fase Kades: pilih Kepala Desa. Vote Kades bernilai 2 saat eliminasi.
-7. Malam: role aktif memilih 1 aksi. Seer hanya 1 terawangan per malam.
-8. Siang: diskusi di chat/voice.
-9. Voting: pilih target eliminasi.
-10. Setelah game selesai, room otomatis kembali ke lobby.
+```txt
+data/players.json
+```
 
-## Cara musik
+Kalau ingin poin, akun, skin, inventory, dan leaderboard tidak hilang ketika redeploy/restart besar, tambahkan Railway Volume dan mount ke:
 
-1. Buka tombol 🎧.
-2. Ketik lagu yang diinginkan, contoh `The Cure Boys Don't Cry`.
-3. Tekan Cari YouTube.
-4. Pilih lagu dari hasil.
-5. Jika host ingin semua pemain dengar bersama, tekan Room / Putar ke Room.
-6. Di HP, tekan Aktifkan di HP jika audio belum terdengar.
+```txt
+/app/data
+```
+
+Tanpa volume, data tetap bisa dipakai saat server hidup, tetapi dapat hilang jika container dibuat ulang.
+
+## Cara main fitur baru
+
+1. Daftar/Login pakai username + PIN.
+2. Upload foto profil opsional.
+3. Beli item di Shop memakai poin.
+4. Equip skin/frame/badge/power di Inventory.
+5. Buat room atau join lobby publik.
+6. Setelah game selesai, poin dan statistik otomatis masuk.
+

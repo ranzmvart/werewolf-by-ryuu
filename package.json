@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "2.6.0",
-  "description": "Werewolf Online by Ryuu - Final Room Browser, Password Lobby, Balance, Guide, YouTube Music, Voice, Reconnect, Auto Reset",
+  "version": "3.0.0",
+  "description": "Werewolf by Ryuu - Profile, PIN Login, Leaderboard Top 100, Points, Shop, Inventory, Skins, Power Items, Shared Music, Voice, Room List",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

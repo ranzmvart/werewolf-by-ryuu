@@ -16,6 +16,28 @@
         <p class="eyebrow">Realtime Social Deduction</p>
         <h1>Werewolf <span>by Ryuu</span></h1>
         <p class="subtitle">Buat room publik/berpassword, join dari daftar lobby, main bareng teman, gunakan role rahasia, voting Kades, musik bersama, dan voice room.</p>
+        <div id="accountHub" class="account-hub glass-lite">
+          <div class="account-head">
+            <div><b>👤 Akun Pemain</b><span>Daftar/login pakai nama unik + PIN. Nama yang sudah dipakai tidak bisa didaftar lagi.</span></div>
+            <span id="accountStatus" class="badge">Belum login</span>
+          </div>
+          <div class="auth-grid">
+            <label>Username<input id="authName" maxlength="18" placeholder="Nama unik kamu" autocomplete="username" /></label>
+            <label>PIN<input id="authPin" maxlength="8" type="password" inputmode="numeric" placeholder="4-8 angka" autocomplete="current-password" /></label>
+            <label class="avatar-pick">Foto Profil<input id="avatarInput" type="file" accept="image/*" /></label>
+            <button id="registerBtn" class="btn primary" type="button">Daftar</button>
+            <button id="loginBtn" class="btn secondary" type="button">Login</button>
+          </div>
+          <div id="profileSummary" class="profile-summary hidden"></div>
+          <div class="hub-tabs">
+            <button id="shopTabBtn" class="hub-tab active" type="button">Shop</button>
+            <button id="invTabBtn" class="hub-tab" type="button">Inventory</button>
+            <button id="lbTabBtn" class="hub-tab" type="button">Leaderboard</button>
+          </div>
+          <div id="shopPanel" class="hub-panel"></div>
+          <div id="inventoryPanel" class="hub-panel hidden"></div>
+          <div id="leaderboardPanel" class="hub-panel hidden"></div>
+        </div>
         <div class="form-grid">
           <label>Nama pemain<input id="nameInput" maxlength="18" placeholder="Nama kamu" autocomplete="nickname" /></label>
           <label>Nama room<input id="roomNameInput" maxlength="28" placeholder="Contoh: Lobby Ryuu" /></label>
@@ -65,6 +87,7 @@
           <div class="panel-head"><h3>Role Kamu</h3><span id="hostBadge" class="badge hidden">HOST</span></div>
           <div id="roleCard" class="role-card empty">Belum ada role</div>
           <div id="privateInfo" class="private-info"></div>
+          <div id="gameProfileBox" class="game-profile-box hidden"></div>
           <div class="host-tools hidden" id="hostTools">
             <h4>Host Control</h4>
             <button id="startBtn" class="btn primary small">Start Game</button>

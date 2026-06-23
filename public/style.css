@@ -729,3 +729,24 @@ body {
     width: 100%;
   }
 }
+
+/* Profile / shop / leaderboard upgrade */
+.account-hub{margin:18px 0;padding:16px;border-radius:22px}
+.account-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.account-head div{display:grid;gap:4px}.account-head span{font-size:.82rem;color:var(--muted)}
+.auth-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:10px;align-items:end}
+.auth-grid label{display:grid;gap:6px;font-size:.82rem;color:var(--muted)}
+.auth-grid input{min-width:0}.avatar-pick input{font-size:.75rem}
+.profile-summary{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin:12px 0;padding:12px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(255,255,255,.04)}
+.profile-avatar{width:62px;height:62px;border-radius:20px;object-fit:cover;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.16)}
+.profile-avatar.frame-gold,.avatar-img.frame-gold{border-color:#facc15;box-shadow:0 0 0 3px rgba(250,204,21,.18)}
+.profile-avatar.frame-wolf,.avatar-img.frame-wolf{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.18)}
+.profile-avatar.frame-crystal,.avatar-img.frame-crystal{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.18)}
+.profile-name{font-weight:800;font-size:1rem}.profile-stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hub-tabs{display:flex;gap:8px;margin:12px 0 10px;overflow:auto}.hub-tab{border:0;border-radius:999px;padding:9px 13px;background:rgba(255,255,255,.08);color:var(--text);cursor:pointer}.hub-tab.active{background:linear-gradient(135deg,#8b5cf6,#ec4899);font-weight:800}
+.hub-panel{max-height:360px;overflow:auto;padding-right:3px}.shop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.shop-item{padding:12px;border-radius:18px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);display:grid;gap:8px}.shop-item.power{background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(139,92,246,.09));border-color:rgba(239,68,68,.22)}.shop-top{display:flex;justify-content:space-between;gap:8px}.shop-name{font-weight:800}.shop-desc{font-size:.8rem;color:var(--muted);line-height:1.35}.shop-actions{display:flex;gap:8px;align-items:center;justify-content:space-between}.price{font-size:.82rem;color:#facc15;font-weight:800}.owned{color:#86efac;font-weight:800;font-size:.8rem}.equip-now{color:#38bdf8;font-weight:800;font-size:.8rem}
+.leader-tabs{display:flex;gap:6px;overflow:auto;margin-bottom:8px}.leader-tabs button{border:0;border-radius:999px;padding:7px 10px;background:rgba(255,255,255,.08);color:var(--text)}.leader-row{display:grid;grid-template-columns:38px 1fr auto;gap:8px;align-items:center;padding:9px;border-radius:14px;background:rgba(255,255,255,.045);margin-bottom:6px}.rank{font-weight:900;color:#facc15}.leader-name{font-weight:800}.leader-meta{font-size:.75rem;color:var(--muted)}
+.game-profile-box{margin-top:12px;padding:10px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:rgba(255,255,255,.04)}
+.player .avatar{overflow:hidden}.avatar-img{width:100%;height:100%;border-radius:inherit;object-fit:cover}.player.skin-shadow{background:linear-gradient(135deg,rgba(127,29,29,.16),rgba(15,23,42,.2))}.player.skin-mystic{background:linear-gradient(135deg,rgba(124,58,237,.16),rgba(15,23,42,.16))}.player.skin-neon{background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(15,23,42,.16))}.player.skin-blood{background:linear-gradient(135deg,rgba(220,38,38,.20),rgba(88,28,135,.12))}
+.power-note{font-size:.82rem;color:#facc15;margin-top:8px}.role-card .power-mini{margin-top:8px;font-size:.8rem;color:#facc15}
+@media (max-width: 760px){.auth-grid{grid-template-columns:1fr 1fr}.auth-grid .btn{width:100%}.shop-grid{grid-template-columns:1fr}.account-head{display:grid}.hub-panel{max-height:300px}.profile-summary{grid-template-columns:auto 1fr}.profile-avatar{width:54px;height:54px}}
