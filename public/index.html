@@ -1,163 +1,166 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Werewolf Online Final</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Werewolf by Ryuu</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="bg-orb orb-1"></div>
-  <div class="bg-orb orb-2"></div>
-  <div class="bg-grid"></div>
-
-  <main id="landing" class="landing shell">
-    <section class="hero-card glass">
-      <div class="brand-row">
-        <div class="logo-mark">🐺</div>
-        <div>
-          <h1>Werewolf Online</h1>
-          <p>Realtime multiplayer • Role rahasia • Kades x2 • Animasi penuh • Voice opsional</p>
+  <div id="app">
+    <section id="login" class="screen login-screen">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="hero-card glass">
+        <div class="brand-mark">🐺</div>
+        <p class="eyebrow">Realtime Social Deduction</p>
+        <h1>Werewolf <span>by Ryuu</span></h1>
+        <p class="subtitle">Buat room, bagikan kode, main bareng teman, gunakan role rahasia, voting Kades, animasi sinematik, dan voice room.</p>
+        <div class="form-grid">
+          <label>Nama pemain<input id="nameInput" maxlength="18" placeholder="Nama kamu" autocomplete="nickname" /></label>
+          <label>Kode room<input id="codeInput" maxlength="5" placeholder="Kosongkan jika buat room" /></label>
+          <button id="createBtn" class="btn primary">Buat Room</button>
+          <button id="joinBtn" class="btn secondary">Join Room</button>
         </div>
-      </div>
-
-      <div class="feature-row">
-        <span>🔮 Seer</span>
-        <span>💉 Doctor</span>
-        <span>🧪 Witch</span>
-        <span>🏹 Hunter</span>
-        <span>👑 Kades</span>
-      </div>
-
-      <div class="form-grid">
-        <label>
-          Nama Kamu
-          <input id="nameInput" maxlength="18" placeholder="Contoh: Ryuu" autocomplete="nickname" />
-        </label>
-        <label>
-          Kode Room
-          <input id="roomInput" maxlength="5" placeholder="Isi jika join" autocomplete="off" />
-        </label>
-      </div>
-
-      <div class="button-row">
-        <button id="createBtn" class="btn primary">Buat Room</button>
-        <button id="joinBtn" class="btn secondary">Join Room</button>
-      </div>
-
-      <p class="hint">Untuk Render, deploy sebagai <b>Web Service</b>. Untuk voice di HP, gunakan link HTTPS Render.</p>
-    </section>
-  </main>
-
-  <main id="game" class="game hidden">
-    <header class="topbar glass">
-      <div class="room-box">
-        <span class="label">ROOM</span>
-        <button id="copyRoomBtn" class="room-code">-----</button>
-      </div>
-      <div class="phase-box">
-        <span id="phaseLabel">Lobby</span>
-        <strong id="timerText">--:--</strong>
-      </div>
-      <div class="top-actions">
-        <button id="voiceBtn" class="btn small ghost">🎙️ Join Voice</button>
-        <button id="muteBtn" class="btn small ghost hidden">🔇 Mute</button>
-        <button id="leaveVoiceBtn" class="btn small danger hidden">Leave</button>
-        <button id="leaveRoomBtn" class="btn small ghost">Keluar</button>
-      </div>
-    </header>
-
-    <section class="layout">
-      <aside class="left-column">
-        <div id="roleCard" class="role-card glass">
-          <div class="role-icon">❔</div>
+        <div class="mini-note">Untuk voice di HP, buka memakai link HTTPS Railway / domain aman.</div>
+        <div id="resumeBox" class="resume-box hidden">
           <div>
-            <p class="label">ROLE KAMU</p>
-            <h2>Belum dibagikan</h2>
-            <p>Menunggu host memulai permainan.</p>
+            <b>Session terakhir ditemukan</b>
+            <span id="resumeText">Kamu bisa masuk ulang ke room sebelumnya.</span>
+          </div>
+          <div class="resume-actions">
+            <button id="resumeBtn" class="btn primary small">Reconnect</button>
+            <button id="clearSessionBtn" class="btn secondary small">Hapus</button>
           </div>
         </div>
-
-        <div class="narrative-card glass">
-          <p class="label">NARASI</p>
-          <h3 id="narrativeTitle">Menunggu permainan...</h3>
-          <p id="narrativeText">Buat room atau undang pemain lain untuk mulai.</p>
-        </div>
-
-        <div id="actionPanel" class="action-panel glass">
-          <p class="label">AKSI</p>
-          <div id="actionContent">Belum ada aksi untuk fase ini.</div>
-        </div>
-      </aside>
-
-      <section class="center-column">
-        <div class="chat-card glass">
-          <div class="chat-head">
-            <div>
-              <p class="label">CHAT & LOG</p>
-              <h3 id="chatMode">Public Chat</h3>
-            </div>
-            <button id="ttsBtn" class="btn small ghost">🔊 Narasi</button>
-          </div>
-          <div id="chatList" class="chat-list"></div>
-          <form id="chatForm" class="chat-form">
-            <input id="chatInput" maxlength="300" placeholder="Tulis pesan..." />
-            <button class="btn primary" type="submit">Kirim</button>
-          </form>
-        </div>
-      </section>
-
-      <aside class="right-column">
-        <div class="players-card glass">
-          <div class="card-head">
-            <div>
-              <p class="label">PEMAIN</p>
-              <h3 id="playersCount">0 pemain</h3>
-            </div>
-            <span id="connectionPill" class="pill ok">Online</span>
-          </div>
-          <div id="playersList" class="players-list"></div>
-        </div>
-
-        <div class="votes-card glass">
-          <p class="label">VOTE</p>
-          <div id="votesList" class="votes-list">Belum ada vote.</div>
-        </div>
-
-        <div id="hostPanel" class="host-panel glass hidden">
-          <p class="label">HOST CONTROL</p>
-          <div class="button-row stack">
-            <button id="startBtn" class="btn primary">Start Game</button>
-            <button id="skipBtn" class="btn secondary">Skip Fase</button>
-            <button id="resetBtn" class="btn danger">Reset Room</button>
-          </div>
-          <details>
-            <summary>Timer Settings</summary>
-            <div class="settings-grid">
-              <label>Mayor <input id="mayorSeconds" type="number" min="15" max="600" /></label>
-              <label>Night <input id="nightSeconds" type="number" min="15" max="600" /></label>
-              <label>Day <input id="daySeconds" type="number" min="15" max="600" /></label>
-              <label>Vote <input id="voteSeconds" type="number" min="15" max="600" /></label>
-              <button id="saveSettingsBtn" class="btn small secondary">Simpan</button>
-            </div>
-          </details>
-        </div>
-      </aside>
+      </div>
     </section>
-  </main>
 
-  <div id="animOverlay" class="anim-overlay hidden">
-    <div id="animCard" class="anim-card">
-      <div id="animIcon" class="anim-icon">🐺</div>
-      <h2 id="animTitle">Title</h2>
-      <p id="animMessage">Message</p>
-      <button id="closeAnimBtn" class="btn primary">OK</button>
+    <section id="game" class="screen game-screen hidden">
+      <header class="topbar glass">
+        <div>
+          <div class="room-code">ROOM <button id="copyCode" class="code-pill">-----</button></div>
+          <h2 id="phaseTitle">Lobby</h2>
+        </div>
+        <div class="timer-wrap">
+          <div class="timer" id="timer">--:--</div>
+          <div class="phase-line"><span id="phaseLine"></span></div>
+          <div id="reconnectStatus" class="reconnect-status">Online</div>
+        </div>
+        <button id="menuBtn" class="btn secondary small menu-btn">Menu</button>
+      </header>
+
+      <main class="layout">
+        <aside class="panel glass left-panel">
+          <div class="panel-head"><h3>Role Kamu</h3><span id="hostBadge" class="badge hidden">HOST</span></div>
+          <div id="roleCard" class="role-card empty">Belum ada role</div>
+          <div id="privateInfo" class="private-info"></div>
+          <div class="host-tools hidden" id="hostTools">
+            <h4>Host Control</h4>
+            <button id="startBtn" class="btn primary small">Start Game</button>
+            <button id="skipBtn" class="btn secondary small">Skip Fase</button>
+            <button id="resetBtn" class="btn danger small">Reset Room</button>
+            <div class="timer-settings">
+              <label>Night <input id="nightSec" type="number" min="20" max="600"></label>
+              <label>Day <input id="daySec" type="number" min="20" max="600"></label>
+              <label>Vote <input id="voteSec" type="number" min="15" max="600"></label>
+              <button id="saveSettings" class="btn secondary small">Simpan Timer</button>
+            </div>
+          </div>
+          <div class="voice-box">
+            <h4>Voice Room</h4>
+            <div class="voice-actions">
+              <button id="joinVoice" class="btn primary small">Join Voice</button>
+              <button id="muteVoice" class="btn secondary small" disabled>Mute</button>
+              <button id="leaveVoice" class="btn danger small" disabled>Leave</button>
+            </div>
+            <div id="voiceStatus" class="mini-note">Belum join voice</div>
+            <div id="remoteAudios"></div>
+          </div>
+        </aside>
+
+        <section class="center-stage">
+          <div id="narrative" class="narrative glass">
+            <b>Menunggu pemain...</b>
+            <span>Buat room atau join room untuk mulai.</span>
+          </div>
+          <div class="action-panel glass" id="actionPanel">
+            <h3>Aksi</h3>
+            <div id="actionHint">Aksi akan muncul sesuai fase dan role.</div>
+            <div id="targetGrid" class="target-grid"></div>
+          </div>
+          <div class="chat glass">
+            <div class="chat-head">
+              <h3>Chat</h3>
+              <select id="chatChannel">
+                <option value="public">Public</option>
+                <option value="wolf">Werewolf</option>
+                <option value="dead">Dead/Medium</option>
+              </select>
+            </div>
+            <div id="chatLog" class="chat-log"></div>
+            <form id="chatForm" class="chat-form">
+              <input id="chatInput" maxlength="300" placeholder="Tulis pesan..." autocomplete="off" />
+              <button class="btn secondary small" type="submit">Kirim</button>
+            </form>
+          </div>
+        </section>
+
+        <aside class="panel glass right-panel">
+          <div class="panel-head"><h3>Pemain</h3><span id="playerCount" class="badge">0</span></div>
+          <div id="players" class="players"></div>
+          <div class="log-box">
+            <h4>Log Game</h4>
+            <div id="gameLogs" class="game-logs"></div>
+          </div>
+        </aside>
+      </main>
+    </section>
+
+    <section id="musicPlayer" class="music-player glass collapsed" aria-label="Music Player">
+      <div class="music-now">
+        <button id="musicToggle" class="music-cover" title="Buka playlist">🎧</button>
+        <div class="music-title-wrap">
+          <div class="music-kicker">Ryuu Radio</div>
+          <div id="musicTitle" class="music-title">Belum ada lagu</div>
+        </div>
+        <div class="music-controls">
+          <button id="musicPrev" class="icon-btn" title="Previous">⏮</button>
+          <button id="musicPlay" class="play-btn" title="Play/Pause">▶</button>
+          <button id="musicNext" class="icon-btn" title="Next">⏭</button>
+        </div>
+        <input id="musicVolume" class="music-volume" type="range" min="0" max="100" value="45" title="Volume" />
+      </div>
+      <div class="music-drawer">
+        <div class="music-tools online-tools">
+          <input id="musicSearch" placeholder="Cari lagu online, radio, atau mood..." autocomplete="off" />
+          <button id="musicOnlineSearch" class="upload-song" type="button">Cari Online</button>
+          <button id="musicRadioSearch" class="upload-song" type="button">Radio</button>
+          <label class="upload-song">
+            + Lokal
+            <input id="musicUpload" type="file" accept="audio/*" multiple hidden />
+          </label>
+        </div>
+        <div class="music-tabs">
+          <button id="musicTabAll" class="music-tab active" type="button">Semua</button>
+          <button id="musicTabOnline" class="music-tab" type="button">Online</button>
+          <button id="musicTabRadio" class="music-tab" type="button">Radio</button>
+        </div>
+        <div id="musicList" class="music-list"></div>
+        <div class="music-note">Cari Online memakai preview legal iTunes/Apple Music ±30 detik. Radio memakai stream internet publik. Spotify full-track tidak dipakai karena butuh login/Premium dan tidak bisa langsung diputar bebas di web.</div>
+      </div>
+    </section>
+
+    <div id="cinematic" class="cinematic hidden">
+      <div class="cinematic-card">
+        <div id="cinematicIcon" class="cinematic-icon">🐺</div>
+        <h2 id="cinematicTitle">Title</h2>
+        <p id="cinematicText">Text</p>
+      </div>
     </div>
+
+    <div id="toastStack" class="toast-stack"></div>
   </div>
-
-  <div id="toastStack" class="toast-stack"></div>
-  <div id="audioMount" class="audio-mount"></div>
-
   <script src="/socket.io/socket.io.js"></script>
   <script src="/client.js"></script>
 </body>

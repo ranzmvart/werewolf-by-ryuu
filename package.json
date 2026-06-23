@@ -1,23 +1,15 @@
 {
-  "name": "werewolf-online-final",
-  "version": "2.0.0",
-  "description": "Werewolf Online Web Game with narration, mayor vote, role reveal animation, and WebRTC voice chat",
+  "name": "werewolf-by-ryuu",
+  "version": "2.2.0",
+  "description": "Werewolf Online Realtime Web Game by Ryuu - Online Music and Auto Reset",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.js"
   },
-  "keywords": [
-    "werewolf",
-    "game",
-    "online",
-    "socket.io",
-    "multiplayer",
-    "webrtc",
-    "voice-chat"
-  ],
-  "author": "Yanto Project",
-  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
