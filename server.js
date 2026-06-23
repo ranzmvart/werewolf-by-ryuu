@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
+const yts = require('yt-search');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +14,32 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu' }));
+
+app.get('/api/music/youtube', async (req, res) => {
+  const q = String(req.query.q || '').trim().slice(0, 120);
+  if (!q) return res.status(400).json({ ok: false, error: 'Query kosong.' });
+  try {
+    const result = await yts(q);
+    const videos = (result.videos || [])
+      .filter(v => v.videoId && !v.isLive)
+      .slice(0, 18)
+      .map(v => ({
+        id: v.videoId,
+        videoId: v.videoId,
+        title: v.title || 'YouTube Video',
+        artist: v.author?.name || 'YouTube',
+        duration: v.timestamp || '',
+        views: v.views || 0,
+        thumbnail: v.thumbnail || '',
+        url: v.url || `https://www.youtube.com/watch?v=${v.videoId}`
+      }));
+    res.json({ ok: true, query: q, results: videos });
+  } catch (error) {
+    console.error('[YouTube Search Error]', error?.message || error);
+    res.status(500).json({ ok: false, error: 'Gagal mencari lagu YouTube.' });
+  }
+});
+
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';

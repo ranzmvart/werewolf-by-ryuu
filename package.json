@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "2.2.0",
-  "description": "Werewolf Online Realtime Web Game by Ryuu - Online Music and Auto Reset",
+  "version": "2.3.0",
+  "description": "Werewolf Online Realtime Web Game by Ryuu - YouTube Music Search, Voice, Reconnect, Auto Reset",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "yt-search": "^2.13.1"
   }
 }

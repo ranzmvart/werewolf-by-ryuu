@@ -535,7 +535,7 @@ window.addEventListener('beforeunload', () => {
   if (localStream) leaveVoice();
 });
 
-// Online Music Player: built-in synth + iTunes previews + public internet radio + local audio upload.
+// Online Music Player: built-in synth + YouTube embed search + iTunes previews + public internet radio + local audio upload.
 (() => {
   const musicEls = {
     player: document.getElementById('musicPlayer'),
@@ -549,10 +549,15 @@ window.addEventListener('beforeunload', () => {
     list: document.getElementById('musicList'),
     upload: document.getElementById('musicUpload'),
     onlineSearch: document.getElementById('musicOnlineSearch'),
+    youtubeSearch: document.getElementById('musicYoutubeSearch'),
     radioSearch: document.getElementById('musicRadioSearch'),
     tabAll: document.getElementById('musicTabAll'),
+    tabYoutube: document.getElementById('musicTabYoutube'),
     tabOnline: document.getElementById('musicTabOnline'),
-    tabRadio: document.getElementById('musicTabRadio')
+    tabRadio: document.getElementById('musicTabRadio'),
+    ytBox: document.getElementById('ytPlayerBox'),
+    ytMount: document.getElementById('ytPlayerMount'),
+    ytHide: document.getElementById('ytHideBtn')
   };
   if (!musicEls.player) return;
 
@@ -577,6 +582,9 @@ window.addEventListener('beforeunload', () => {
     timer: null,
     step: 0,
     audio: null,
+    ytPlayer: null,
+    ytApiPromise: null,
+    currentYoutubeId: null,
     tab: 'all',
     loading: false
   };
@@ -604,6 +612,7 @@ window.addEventListener('beforeunload', () => {
     localStorage.setItem('ryuuMusicVolume', String(musicEls.volume.value));
     if (musicState.gain) musicState.gain.gain.setTargetAtTime(v * 0.32, musicState.ctx.currentTime, 0.04);
     if (musicState.audio) musicState.audio.volume = v * 0.82;
+    try { if (musicState.ytPlayer?.setVolume) musicState.ytPlayer.setVolume(Math.round(v * 100)); } catch {}
   }
 
   function noteFreq(root, semi) {
@@ -655,6 +664,7 @@ window.addEventListener('beforeunload', () => {
       musicState.audio.src = '';
       musicState.audio = null;
     }
+    try { if (musicState.ytPlayer?.stopVideo) musicState.ytPlayer.stopVideo(); } catch {}
     musicState.playing = false;
     if (!keepButton) musicEls.play.textContent = '▶';
     renderMusicList();
@@ -669,6 +679,11 @@ window.addEventListener('beforeunload', () => {
     musicEls.play.textContent = '⏸';
     musicEls.title.textContent = `${song.title} — ${song.artist}`;
     renderMusicList();
+
+    if (song.source === 'youtube' && song.videoId) {
+      await playYouTube(song);
+      return;
+    }
 
     if (song.url) {
       const audio = new Audio(song.url);
@@ -718,6 +733,7 @@ window.addEventListener('beforeunload', () => {
   }
 
   function tabMatches(song) {
+    if (musicState.tab === 'youtube') return song.source === 'youtube';
     if (musicState.tab === 'online') return song.source === 'online';
     if (musicState.tab === 'radio') return song.source === 'radio';
     return true;
@@ -725,7 +741,7 @@ window.addEventListener('beforeunload', () => {
 
   function setTab(tab) {
     musicState.tab = tab;
-    for (const [name, el] of [['all', musicEls.tabAll], ['online', musicEls.tabOnline], ['radio', musicEls.tabRadio]]) {
+    for (const [name, el] of [['all', musicEls.tabAll], ['youtube', musicEls.tabYoutube], ['online', musicEls.tabOnline], ['radio', musicEls.tabRadio]]) {
       el?.classList.toggle('active', name === tab);
     }
     renderMusicList();
@@ -739,18 +755,18 @@ window.addEventListener('beforeunload', () => {
       .filter(({ song }) => !query || `${song.title} ${song.artist} ${song.mood || ''} ${song.source || ''}`.toLowerCase().includes(query));
 
     if (!musicState.filtered.length) {
-      const msg = musicState.loading ? 'Sedang mencari online...' : 'Tidak ada lagu yang cocok. Coba tekan Cari Online atau Radio.';
+      const msg = musicState.loading ? 'Sedang mencari online...' : 'Tidak ada lagu yang cocok. Coba tekan Cari YouTube, Preview, atau Radio.';
       musicEls.list.innerHTML = `<div class="music-note">${msg}</div>`;
       return;
     }
     musicEls.list.innerHTML = musicState.filtered.map(({ song, index }) => {
       const active = index === musicState.index;
-      const sourceLabel = song.source === 'online' ? 'Preview online' : song.source === 'radio' ? 'Internet radio' : song.source === 'local' ? 'Lokal' : 'Built-in';
+      const sourceLabel = song.source === 'youtube' ? 'YouTube' : song.source === 'online' ? 'Preview online' : song.source === 'radio' ? 'Internet radio' : song.source === 'local' ? 'Lokal' : 'Built-in';
       return `<div class="song-row ${active ? 'active' : ''} ${escapeHtml(song.source || '')}">
-        <div class="song-art">${escapeHtml(song.emoji || '🎵')}</div>
+        <div class="song-art">${song.thumbnail ? `<img class="song-thumb" src="${escapeHtml(song.thumbnail)}" alt="" loading="lazy" />` : escapeHtml(song.emoji || '🎵')}</div>
         <div>
           <div class="song-name">${escapeHtml(song.title)}</div>
-          <div class="song-meta">${escapeHtml(song.artist)} • ${sourceLabel}${song.mood ? ' • ' + escapeHtml(song.mood) : ''}</div>
+          <div class="song-meta">${escapeHtml(song.artist)} • ${sourceLabel}${song.duration ? ` • <span class="song-duration">${escapeHtml(song.duration)}</span>` : ''}${song.mood ? ' • ' + escapeHtml(song.mood) : ''}</div>
         </div>
         <button class="song-play" data-song-index="${index}">${active && musicState.playing ? '⏸' : '▶'}</button>
       </div>`;
@@ -770,6 +786,115 @@ window.addEventListener('beforeunload', () => {
     const first = musicState.songs.findIndex(s => s.source === source);
     if (first >= 0) musicState.index = first;
     renderMusicList();
+  }
+
+  function loadYouTubeApi() {
+    if (window.YT?.Player) return Promise.resolve();
+    if (musicState.ytApiPromise) return musicState.ytApiPromise;
+    musicState.ytApiPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-yt-api="true"]');
+      const previousReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof previousReady === 'function') previousReady();
+        resolve();
+      };
+      if (!existing) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.dataset.ytApi = 'true';
+        tag.onerror = () => reject(new Error('YouTube API gagal dimuat'));
+        document.head.appendChild(tag);
+      }
+      setTimeout(() => {
+        if (window.YT?.Player) resolve();
+      }, 2500);
+    });
+    return musicState.ytApiPromise;
+  }
+
+  async function playYouTube(song) {
+    try {
+      await loadYouTubeApi();
+      musicEls.ytBox?.classList.remove('hidden');
+      const volume = Number(musicEls.volume.value || 45);
+
+      if (musicState.ytPlayer?.loadVideoById) {
+        musicState.ytPlayer.loadVideoById(song.videoId);
+        musicState.ytPlayer.setVolume?.(volume);
+        return;
+      }
+
+      musicState.ytPlayer = new YT.Player('ytPlayerMount', {
+        width: '100%',
+        height: '160',
+        videoId: song.videoId,
+        playerVars: {
+          autoplay: 1,
+          playsinline: 1,
+          rel: 0,
+          modestbranding: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: (event) => {
+            event.target.setVolume(volume);
+            event.target.playVideo();
+          },
+          onStateChange: (event) => {
+            if (event.data === YT.PlayerState.ENDED) move(1);
+            if (event.data === YT.PlayerState.PLAYING) {
+              musicState.playing = true;
+              musicEls.play.textContent = '⏸';
+              renderMusicList();
+            }
+            if (event.data === YT.PlayerState.PAUSED) {
+              musicState.playing = false;
+              musicEls.play.textContent = '▶';
+              renderMusicList();
+            }
+          },
+          onError: () => {
+            toast('YouTube error', 'Video ini tidak bisa diputar sebagai embed. Coba pilihan lain.');
+            stopCurrent();
+          }
+        }
+      });
+    } catch (err) {
+      toast('YouTube gagal', 'Player YouTube gagal dimuat. Coba refresh atau lagu lain.');
+      stopCurrent();
+    }
+  }
+
+  async function searchYouTube() {
+    const term = musicEls.search.value.trim();
+    if (!term) return toast('Masukkan judul lagu', 'Contoh: The Cure Boys Don\'t Cry, Hindia, Joji, anime opening.');
+    musicState.loading = true;
+    setTab('youtube');
+    renderMusicList();
+    try {
+      const res = await fetch(`/api/music/youtube?q=${encodeURIComponent(term)}`);
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Search gagal');
+      const songs = (data.results || []).map(x => ({
+        source: 'youtube',
+        id: `yt-${x.videoId}`,
+        emoji: '▶',
+        title: x.title || 'YouTube Video',
+        artist: x.artist || 'YouTube',
+        mood: x.views ? `${Number(x.views).toLocaleString('id-ID')} views` : 'YouTube result',
+        duration: x.duration || '',
+        videoId: x.videoId,
+        thumbnail: x.thumbnail || '',
+        watchUrl: x.url
+      }));
+      addOrReplaceSongs(songs, 'youtube');
+      toast('Hasil YouTube', songs.length ? `${songs.length} pilihan ditemukan.` : 'Tidak ada hasil YouTube.');
+    } catch (err) {
+      toast('Cari YouTube gagal', 'Server belum bisa mencari YouTube. Coba deploy ulang atau kata kunci lain.');
+    } finally {
+      musicState.loading = false;
+      renderMusicList();
+    }
   }
 
   async function searchOnline() {
@@ -841,11 +966,14 @@ window.addEventListener('beforeunload', () => {
   musicEls.volume.addEventListener('input', applyVolume);
   musicEls.search.addEventListener('input', renderMusicList);
   musicEls.search.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') searchOnline();
+    if (e.key === 'Enter') searchYouTube();
   });
+  musicEls.youtubeSearch?.addEventListener('click', searchYouTube);
   musicEls.onlineSearch?.addEventListener('click', searchOnline);
   musicEls.radioSearch?.addEventListener('click', searchRadio);
+  musicEls.ytHide?.addEventListener('click', () => musicEls.ytBox?.classList.add('hidden'));
   musicEls.tabAll?.addEventListener('click', () => setTab('all'));
+  musicEls.tabYoutube?.addEventListener('click', () => setTab('youtube'));
   musicEls.tabOnline?.addEventListener('click', () => setTab('online'));
   musicEls.tabRadio?.addEventListener('click', () => setTab('radio'));
   musicEls.upload.addEventListener('change', () => {

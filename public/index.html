@@ -134,7 +134,8 @@
       <div class="music-drawer">
         <div class="music-tools online-tools">
           <input id="musicSearch" placeholder="Cari lagu online, radio, atau mood..." autocomplete="off" />
-          <button id="musicOnlineSearch" class="upload-song" type="button">Cari Online</button>
+          <button id="musicYoutubeSearch" class="upload-song primary-music" type="button">Cari YouTube</button>
+          <button id="musicOnlineSearch" class="upload-song" type="button">Preview</button>
           <button id="musicRadioSearch" class="upload-song" type="button">Radio</button>
           <label class="upload-song">
             + Lokal
@@ -143,11 +144,16 @@
         </div>
         <div class="music-tabs">
           <button id="musicTabAll" class="music-tab active" type="button">Semua</button>
-          <button id="musicTabOnline" class="music-tab" type="button">Online</button>
+          <button id="musicTabYoutube" class="music-tab" type="button">YouTube</button>
+          <button id="musicTabOnline" class="music-tab" type="button">Preview</button>
           <button id="musicTabRadio" class="music-tab" type="button">Radio</button>
         </div>
+        <div id="ytPlayerBox" class="yt-player-box hidden">
+          <div class="yt-player-head"><span>▶ YouTube Player</span><button id="ytHideBtn" type="button">Sembunyikan</button></div>
+          <div id="ytPlayerMount"></div>
+        </div>
         <div id="musicList" class="music-list"></div>
-        <div class="music-note">Cari Online memakai preview legal iTunes/Apple Music ±30 detik. Radio memakai stream internet publik. Spotify full-track tidak dipakai karena butuh login/Premium dan tidak bisa langsung diputar bebas di web.</div>
+        <div class="music-note">Cari YouTube akan menampilkan pilihan lagu/video seperti search music. Pemutaran dilakukan lewat embedded YouTube player resmi. Preview memakai iTunes/Apple Music ±30 detik, Radio memakai stream publik, dan Lokal memakai file dari perangkat.</div>
       </div>
     </section>
 
