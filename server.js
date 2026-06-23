@@ -15,6 +15,7 @@ try {
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 const yts = require('yt-search');
 
@@ -27,7 +28,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '2.4.0-shared-music' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '2.6.0-room-list-password' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);
@@ -101,6 +102,18 @@ const ROLE_META = {
   Jester: {
     team: 'jester', emoji: '🃏', aura: 'pink',
     desc: 'Tujuan rahasia: menang sendiri jika berhasil dieliminasi lewat voting.'
+  },
+  'Cursed Villager': {
+    team: 'village', emoji: '🌘', aura: 'blood',
+    desc: 'Warga terkutuk. Jika dimangsa Werewolf, tidak langsung mati dan berubah menjadi Werewolf sekali.'
+  },
+  Prince: {
+    team: 'village', emoji: '👑', aura: 'amber',
+    desc: 'Punya perlindungan bangsawan: sekali saja selamat dari eliminasi voting dan role-nya terbuka.'
+  },
+  Priest: {
+    team: 'village', emoji: '⛪', aura: 'blue',
+    desc: 'Sekali per game bisa memberi Holy Shield kepada satu pemain saat malam.'
   }
 };
 
@@ -117,6 +130,57 @@ function nowId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+function cleanRoomName(name) {
+  const n = String(name || '').replace(/<[^>]*>/g, '').trim();
+  return n.slice(0, 28) || 'Lobby Werewolf';
+}
+
+function cleanPassword(password) {
+  return String(password || '').trim().slice(0, 64);
+}
+
+function hashPassword(password) {
+  const pass = cleanPassword(password);
+  if (!pass) return null;
+  return crypto.createHash('sha256').update(pass).digest('hex');
+}
+
+function verifyRoomPassword(room, password) {
+  if (!room?.passwordHash) return true;
+  return hashPassword(password) === room.passwordHash;
+}
+
+function roomSummary(room) {
+  const players = [...room.players.values()];
+  const connected = players.filter(p => p.connected).length;
+  const alive = players.filter(p => p.alive).length;
+  return {
+    code: room.code,
+    name: room.name || 'Lobby Werewolf',
+    phase: room.phase,
+    day: room.day || 0,
+    playerCount: players.length,
+    connectedCount: connected,
+    aliveCount: alive,
+    maxPlayers: room.maxPlayers || 16,
+    hasPassword: !!room.passwordHash,
+    hostName: room.players.get(room.hostId)?.name || 'Host',
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt || room.createdAt
+  };
+}
+
+function getPublicRooms() {
+  return [...rooms.values()]
+    .filter(room => room.phase === 'lobby' || room.phase === 'roleReveal' || room.phase === 'mayorVote')
+    .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+    .slice(0, 50)
+    .map(roomSummary);
+}
+
+function emitRoomList() {
+  io.emit('rooms:list', getPublicRooms());
+}
 
 function publicMusic(music = {}) {
   return {
@@ -186,9 +250,12 @@ function cleanName(name) {
   return n.slice(0, 18) || 'Player';
 }
 
-function newRoom(code, hostPlayerId, hostName) {
+function newRoom(code, hostPlayerId, hostName, options = {}) {
   return {
     code,
+    name: cleanRoomName(options.roomName || `${cleanName(hostName)}'s Room`),
+    passwordHash: hashPassword(options.password || ''),
+    maxPlayers: 16,
     hostId: hostPlayerId,
     phase: 'lobby',
     day: 0,
@@ -218,8 +285,11 @@ function newRoom(code, hostPlayerId, hostName) {
       by: null
     },
     hunterQueue: [],
+    hunterNext: null,
     gameOver: null,
+    nightEvent: null,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     lastEmptyAt: null
   };
 }
@@ -241,6 +311,9 @@ function playerPublic(room, p) {
 function roomPublic(room) {
   return {
     code: room.code,
+    name: room.name || 'Lobby Werewolf',
+    hasPassword: !!room.passwordHash,
+    maxPlayers: room.maxPlayers || 16,
     phase: room.phase,
     day: room.day,
     settings: room.settings,
@@ -251,6 +324,7 @@ function roomPublic(room) {
     mayorState: getMayorVoteState(room),
     gameOver: room.gameOver,
     autoResetAt: room.autoResetAt || null,
+    nightEvent: room.nightEvent || null,
     music: publicMusic(room.music)
   };
 }
@@ -268,18 +342,25 @@ function privateState(room, id) {
     isMayor: !!p.isMayor,
     witchHealUsed: !!p.witchHealUsed,
     witchPoisonUsed: !!p.witchPoisonUsed,
+    priestBlessUsed: !!p.priestBlessUsed,
+    princeShieldUsed: !!p.princeShieldUsed,
+    cursedTurned: !!p.cursedTurned,
     lastInfo: p.lastInfo || '',
     actionDone: [...room.nightActions.values()].some(a => a.actor === p.id),
+    wolfTeamIds: ROLE_META[p.role]?.team === 'werewolf' ? [...room.players.values()].filter(x => x.alive && ROLE_META[x.role]?.team === 'werewolf').map(x => x.id) : [],
+    nightEvent: room.nightEvent || null,
     voteTarget: room.votes.get(p.id) || null,
     mayorVoteTarget: room.mayorVotes.get(p.id) || null
   };
 }
 
 function sendState(room) {
+  room.updatedAt = Date.now();
   io.to(room.code).emit('room:state', roomPublic(room));
   for (const p of room.players.values()) {
     io.to(p.id).emit('me:state', privateState(room, p.id));
   }
+  emitRoomList();
 }
 
 function addLog(room, text, type = 'info') {
@@ -338,12 +419,21 @@ function setPhase(room, phase, seconds, onEnd) {
 }
 
 function roleDeckFor(count) {
-  const wolves = count >= 10 ? 3 : count >= 7 ? 2 : 1;
+  const wolves = count >= 12 ? 3 : count >= 7 ? 2 : 1;
   const deck = [];
   if (wolves >= 1) deck.push('Alpha Werewolf');
   for (let i = 1; i < wolves; i++) deck.push('Werewolf');
-  const specials = ['Seer', 'Doctor', 'Hunter', 'Bodyguard', 'Witch', 'Medium'];
+
+  const specials = ['Seer', 'Doctor'];
+  if (count >= 5) specials.push('Hunter');
+  if (count >= 6) specials.push('Bodyguard');
   if (count >= 7) specials.push('Jester');
+  if (count >= 8) specials.push('Witch');
+  if (count >= 9) specials.push('Medium');
+  if (count >= 10) specials.push('Cursed Villager');
+  if (count >= 11) specials.push('Prince');
+  if (count >= 12) specials.push('Priest');
+
   for (const role of specials) {
     if (deck.length < count) deck.push(role);
   }
@@ -374,6 +464,7 @@ function startGame(room) {
   room.votes.clear();
   room.mayorVotes.clear();
   room.hunterQueue = [];
+  room.hunterNext = null;
   room.gameOver = null;
   for (const p of room.players.values()) {
     p.role = null;
@@ -383,7 +474,11 @@ function startGame(room) {
     p.lastInfo = '';
     p.witchHealUsed = false;
     p.witchPoisonUsed = false;
+    p.priestBlessUsed = false;
+    p.princeShieldUsed = false;
+    p.cursedTurned = false;
   }
+  room.nightEvent = null;
   const deck = roleDeckFor(players.length);
   shuffle(players).forEach((p, i) => {
     p.role = deck[i];
@@ -434,16 +529,38 @@ function resolveMayorVote(room) {
   startNight(room);
 }
 
+
+function rollNightEvent(day) {
+  if (day <= 1) return null;
+  const r = Math.random();
+  if (r < 0.18) return { id: 'mist', emoji: '🌫️', name: 'Kabut Tebal', desc: 'Seer hanya melihat tim, bukan role detail, pada malam ini.' };
+  if (r < 0.32) return { id: 'bloodMoon', emoji: '🩸', name: 'Blood Moon', desc: 'Serangan Werewolf menembus perlindungan biasa Doctor. Holy Shield, Witch, dan Bodyguard tetap kuat.' };
+  if (r < 0.46) return { id: 'holyNight', emoji: '✨', name: 'Holy Night', desc: 'Kekuatan desa akan menyelamatkan satu korban pertama malam ini.' };
+  return null;
+}
+
+function hasNightAction(room, actorId) {
+  return [...room.nightActions.values()].some(a => a.actor === actorId);
+}
+
+function rejectNightAction(player, title = 'Aksi Ditolak', text = 'Aksi role kamu untuk malam ini sudah terkunci.') {
+  personalAnim(player.id, 'blocked', title, text, { aura: 'amber' });
+}
+
 function startNight(room) {
   if (checkWin(room)) return;
   room.day += 1;
   room.nightActions.clear();
   room.votes.clear();
+  room.nightEvent = rollNightEvent(room.day);
   for (const p of room.players.values()) p.lastInfo = '';
   narrative(room, `Malam ${room.day}`, 'Desa menjadi sunyi. Role malam mulai bergerak dalam bayangan.', 'dark');
+  if (room.nightEvent) {
+    narrative(room, `${room.nightEvent.emoji} ${room.nightEvent.name}`, room.nightEvent.desc, room.nightEvent.id === 'bloodMoon' ? 'blood' : room.nightEvent.id === 'mist' ? 'violet' : 'green');
+  }
   for (const p of alivePlayers(room)) {
     const meta = ROLE_META[p.role];
-    if (['Werewolf','Alpha Werewolf','Seer','Doctor','Hunter','Bodyguard','Witch','Medium'].includes(p.role)) {
+    if (['Werewolf','Alpha Werewolf','Seer','Doctor','Bodyguard','Witch','Medium','Priest'].includes(p.role)) {
       personalAnim(p.id, 'nightRole', `${meta.emoji} Giliran ${p.role}`, nightHintFor(p), { role: p.role, aura: meta.aura });
     }
   }
@@ -459,13 +576,16 @@ function nightHintFor(p) {
     case 'Bodyguard': return 'Pilih satu pemain untuk dijaga. Kamu bisa berkorban untuknya.';
     case 'Witch': return 'Pilih aksi heal atau poison. Tiap ramuan hanya bisa dipakai sekali.';
     case 'Medium': return 'Kamu bisa membaca chat pemain mati. Gunakan informasi arwah saat siang.';
+    case 'Priest': return p.priestBlessUsed ? 'Holy Shield kamu sudah habis. Tunggu pagi.' : 'Pilih satu pemain untuk diberi Holy Shield. Skill ini hanya sekali per game.';
+    case 'Cursed Villager': return 'Kamu tidak punya aksi aktif. Jika Werewolf menyerangmu, kutukan bisa bangkit.';
+    case 'Prince': return 'Kamu tidak punya aksi malam. Kamu punya perlindungan khusus dari voting satu kali.';
     default: return 'Tetap diam dan perhatikan tanda-tanda mencurigakan.';
   }
 }
 
 function actionNeeded(p) {
   if (!p.alive) return false;
-  return ['Werewolf','Alpha Werewolf','Seer','Doctor','Bodyguard'].includes(p.role) || (p.role === 'Witch' && (!p.witchHealUsed || !p.witchPoisonUsed));
+  return ['Werewolf','Alpha Werewolf','Seer','Doctor','Bodyguard'].includes(p.role) || (p.role === 'Priest' && !p.priestBlessUsed) || (p.role === 'Witch' && (!p.witchHealUsed || !p.witchPoisonUsed));
 }
 
 function submitNightAction(room, socket, data) {
@@ -474,37 +594,58 @@ function submitNightAction(room, socket, data) {
   const target = room.players.get(data?.targetId);
   const type = String(data?.type || 'main');
 
+  if (hasNightAction(room, p.id)) {
+    return rejectNightAction(p, 'Aksi Sudah Dipakai', 'Setiap role hanya bisa melakukan satu aksi pada satu malam. Tunggu fase berikutnya.');
+  }
+
   if (['Werewolf','Alpha Werewolf'].includes(p.role)) {
-    if (!target || !target.alive || ROLE_META[target.role]?.team === 'werewolf') return;
+    if (!target || !target.alive || target.id === p.id || ROLE_META[target.role]?.team === 'werewolf') return rejectNightAction(p, 'Target Tidak Valid', 'Werewolf tidak bisa menarget diri sendiri atau sesama Werewolf.');
     room.nightActions.set(p.id, { actor: p.id, role: p.role, type: 'kill', target: target.id });
-    personalAnim(p.id, 'attack', 'Target Ditandai', `${target.name} menjadi target seranganmu malam ini.`, { aura: 'blood' });
+    personalAnim(p.id, 'attack', 'Target Terkunci', `${target.name} menjadi target seranganmu malam ini. Aksi tidak bisa diganti.`, { aura: 'blood' });
     emitWolves(room, 'werewolf:choice', { actorName: p.name, targetName: target.name });
   } else if (p.role === 'Seer') {
-    if (!target || !target.alive || target.id === p.id) return;
+    if (!target || !target.alive || target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Seer harus menerawang satu pemain lain yang masih hidup.');
     room.nightActions.set(p.id, { actor: p.id, role: p.role, type: 'scan', target: target.id });
     const meta = ROLE_META[target.role];
-    p.lastInfo = `${target.name} adalah ${target.role} (${meta.team}).`;
+    if (room.nightEvent?.id === 'mist') {
+      const teamLabel = meta.team === 'werewolf' ? 'Werewolf' : meta.team === 'jester' ? 'Netral/Jester' : 'Village';
+      p.lastInfo = `${target.name} berada di sisi ${teamLabel}. Kabut menutupi role detailnya.`;
+    } else {
+      p.lastInfo = `${target.name} adalah ${target.role} (${meta.team}).`;
+    }
     personalAnim(p.id, 'seer', 'Hasil Terawangan', p.lastInfo, { aura: 'violet' });
   } else if (p.role === 'Doctor') {
-    if (!target || !target.alive) return;
+    if (!target || !target.alive) return rejectNightAction(p, 'Target Tidak Valid', 'Doctor hanya bisa melindungi pemain hidup.');
     room.nightActions.set(p.id, { actor: p.id, role: p.role, type: 'protect', target: target.id });
-    personalAnim(p.id, 'heal', 'Perlindungan Diberikan', `${target.name} kamu lindungi malam ini.`, { aura: 'green' });
+    personalAnim(p.id, 'heal', 'Perlindungan Terkunci', `${target.name} kamu lindungi malam ini.`, { aura: 'green' });
   } else if (p.role === 'Bodyguard') {
-    if (!target || !target.alive || target.id === p.id) return;
+    if (!target || !target.alive || target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Bodyguard harus menjaga pemain lain yang masih hidup.');
     room.nightActions.set(p.id, { actor: p.id, role: p.role, type: 'guard', target: target.id });
-    personalAnim(p.id, 'guard', 'Penjagaan Aktif', `Kamu berjaga di dekat ${target.name}.`, { aura: 'blue' });
+    personalAnim(p.id, 'guard', 'Penjagaan Terkunci', `Kamu berjaga di dekat ${target.name}.`, { aura: 'blue' });
+  } else if (p.role === 'Priest') {
+    if (p.priestBlessUsed) return rejectNightAction(p, 'Holy Shield Habis', 'Priest hanya punya satu Holy Shield per game.');
+    if (!target || !target.alive) return rejectNightAction(p, 'Target Tidak Valid', 'Priest hanya bisa memberi Holy Shield kepada pemain hidup.');
+    room.nightActions.set(p.id, { actor: p.id, role: p.role, type: 'bless', target: target.id });
+    p.priestBlessUsed = true;
+    personalAnim(p.id, 'bless', 'Holy Shield Terkunci', `${target.name} mendapat perlindungan suci malam ini.`, { aura: 'blue' });
   } else if (p.role === 'Witch') {
-    if (!target || !target.alive) return;
-    if (type === 'heal' && !p.witchHealUsed) {
+    if (!target || !target.alive) return rejectNightAction(p, 'Target Tidak Valid', 'Witch hanya bisa menarget pemain hidup.');
+    if (type === 'heal') {
+      if (p.witchHealUsed) return rejectNightAction(p, 'Ramuan Heal Habis', 'Ramuan heal hanya bisa dipakai satu kali per game.');
       room.nightActions.set(`${p.id}:heal`, { actor: p.id, role: p.role, type: 'witchHeal', target: target.id });
       p.witchHealUsed = true;
-      personalAnim(p.id, 'heal', 'Ramuan Heal Dipakai', `${target.name} akan diselamatkan jika diserang.`, { aura: 'green' });
-    }
-    if (type === 'poison' && !p.witchPoisonUsed && target.id !== p.id) {
+      personalAnim(p.id, 'heal', 'Ramuan Heal Terkunci', `${target.name} akan diselamatkan jika diserang.`, { aura: 'green' });
+    } else if (type === 'poison') {
+      if (p.witchPoisonUsed) return rejectNightAction(p, 'Ramuan Poison Habis', 'Ramuan poison hanya bisa dipakai satu kali per game.');
+      if (target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Witch tidak bisa poison diri sendiri.');
       room.nightActions.set(`${p.id}:poison`, { actor: p.id, role: p.role, type: 'witchPoison', target: target.id });
       p.witchPoisonUsed = true;
-      personalAnim(p.id, 'poison', 'Ramuan Poison Dipakai', `${target.name} terkena kutukan racun.`, { aura: 'green' });
+      personalAnim(p.id, 'poison', 'Ramuan Poison Terkunci', `${target.name} terkena kutukan racun.`, { aura: 'green' });
+    } else {
+      return rejectNightAction(p, 'Pilih Ramuan', 'Pilih mode Heal atau Poison dulu.');
     }
+  } else {
+    return rejectNightAction(p, 'Tidak Ada Aksi', 'Role kamu tidak punya aksi aktif pada malam ini.');
   }
   sendState(room);
 
@@ -534,20 +675,36 @@ function resolveNight(room) {
     if (score > wolfScore) { wolfScore = score; wolfTargetId = id; }
   }
 
-  const protectedIds = new Set(actions.filter(a => a.type === 'protect' || a.type === 'witchHeal').map(a => a.target));
+  const doctorProtected = new Set(actions.filter(a => a.type === 'protect').map(a => a.target));
+  const holyProtected = new Set(actions.filter(a => a.type === 'bless' || a.type === 'witchHeal').map(a => a.target));
   const guardActions = actions.filter(a => a.type === 'guard');
   const poisonTargets = actions.filter(a => a.type === 'witchPoison').map(a => a.target);
   const deaths = [];
   const saved = [];
+  const transformed = [];
+  let holyNightUsed = false;
 
   if (wolfTargetId) {
+    const wolfTarget = room.players.get(wolfTargetId);
     const guard = guardActions.find(a => a.target === wolfTargetId);
-    if (protectedIds.has(wolfTargetId)) {
-      saved.push(wolfTargetId);
-    } else if (guard) {
+    const doctorWorks = doctorProtected.has(wolfTargetId) && room.nightEvent?.id !== 'bloodMoon';
+    const holyWorks = holyProtected.has(wolfTargetId);
+
+    if (guard) {
       deaths.push({ id: guard.actor, reason: 'berkorban sebagai Bodyguard' });
       saved.push(wolfTargetId);
+    } else if (holyWorks) {
+      saved.push(wolfTargetId);
+    } else if (doctorWorks) {
+      saved.push(wolfTargetId);
+    } else if (room.nightEvent?.id === 'holyNight' && !holyNightUsed) {
+      holyNightUsed = true;
+      saved.push(wolfTargetId);
+    } else if (wolfTarget?.role === 'Cursed Villager' && !wolfTarget.cursedTurned) {
+      transformCursed(room, wolfTarget);
+      transformed.push(wolfTargetId);
     } else {
+      if (room.nightEvent?.id === 'bloodMoon' && doctorProtected.has(wolfTargetId)) addLog(room, 'Blood Moon menembus perlindungan Doctor biasa.', 'blood');
       deaths.push({ id: wolfTargetId, reason: 'dimangsa Werewolf' });
     }
   }
@@ -568,19 +725,32 @@ function resolveNight(room) {
   for (const [id, reason] of uniqueDeaths.entries()) {
     const target = room.players.get(id);
     if (target && target.alive) {
-      killPlayer(room, target, reason, 'night');
-      deadNames.push(target.name);
+      const died = killPlayer(room, target, reason, 'night');
+      if (died) deadNames.push(target.name);
     }
   }
 
   if (deadNames.length) {
     narrative(room, 'Korban Malam', `${deadNames.join(', ')} ditemukan tidak bernyawa.`, 'blood');
+  } else if (transformed.length) {
+    narrative(room, 'Kutukan Bangkit', 'Tidak ada mayat ditemukan, tetapi sesuatu di dalam desa telah berubah.', 'blood');
   } else {
     narrative(room, 'Malam Tanpa Korban', 'Tidak ada pemain yang mati malam ini. Desa masih punya harapan.', 'green');
   }
 
+  room.nightEvent = null;
   if (checkWin(room)) return;
+  if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0], 'day');
   startDay(room);
+}
+
+function transformCursed(room, target) {
+  target.role = 'Werewolf';
+  target.cursedTurned = true;
+  target.lastInfo = 'Kutukanmu bangkit. Kamu sekarang menjadi Werewolf.';
+  personalAnim(target.id, 'cursed', 'Kutukan Bangkit', 'Kamu diserang Werewolf, tetapi kutukan mengubahmu menjadi Werewolf.', { aura: 'blood', role: target.role });
+  roomAnim(room, 'cursed', 'Kutukan Bangkit', `${target.name} selamat dari malam, tetapi kegelapan bertambah kuat.`, { targetId: target.id });
+  addLog(room, `${target.name} tidak mati. Kutukan Cursed Villager telah bangkit.`, 'blood');
 }
 
 function startDay(room) {
@@ -633,30 +803,37 @@ function resolveVoting(room) {
   }
   const target = room.players.get(tied[0]);
   if (target?.alive) {
-    killPlayer(room, target, 'dieliminasi oleh voting desa', 'vote');
+    const died = killPlayer(room, target, 'dieliminasi oleh voting desa', 'vote');
     target.publicRole = target.role;
+    if (!died) {
+      if (checkWin(room)) return;
+      return startNight(room);
+    }
     roomAnim(room, 'execution', 'Eliminasi Desa', `${target.name} dieliminasi. Role-nya: ${target.role}.`, { targetId: target.id, role: target.role });
     if (target.role === 'Jester') {
       return endGame(room, 'jester', `${target.name} adalah Jester dan menang karena berhasil dieliminasi!`);
     }
     if (target.role === 'Hunter') {
-      room.hunterQueue.push(target.id);
-      return startHunter(room, target.id);
+      return startHunter(room, target.id, 'night');
     }
   }
   if (checkWin(room)) return;
   startNight(room);
 }
 
-function startHunter(room, hunterId) {
+function startHunter(room, hunterId, nextPhase = 'night') {
   const hunter = room.players.get(hunterId);
-  if (!hunter) return startNight(room);
+  if (!hunter) return nextPhase === 'day' ? startDay(room) : startNight(room);
+  room.hunterNext = nextPhase;
   narrative(room, 'Hunter Revenge', `${hunter.name} adalah Hunter. Ia boleh menembak satu pemain sebelum gugur sepenuhnya.`, 'amber');
   personalAnim(hunterId, 'hunter', 'Kesempatan Terakhir', 'Pilih satu pemain untuk ditembak.', { aura: 'amber' });
   setPhase(room, 'hunter', room.settings.hunterSec, () => {
     room.hunterQueue.shift();
     if (checkWin(room)) return;
-    startNight(room);
+    if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0], room.hunterNext || nextPhase);
+    const next = room.hunterNext || nextPhase;
+    room.hunterNext = null;
+    return next === 'day' ? startDay(room) : startNight(room);
   });
 }
 
@@ -671,14 +848,27 @@ function hunterShoot(room, socket, targetId) {
   target.publicRole = target.role;
   roomAnim(room, 'hunterShot', 'Tembakan Hunter', `${target.name} tertembak. Role-nya: ${target.role}.`, { targetId: target.id, role: target.role });
   room.hunterQueue.shift();
-  if (target.role === 'Hunter') room.hunterQueue.push(target.id);
+  if (target.role === 'Hunter' && !room.hunterQueue.includes(target.id)) room.hunterQueue.push(target.id);
   if (checkWin(room)) return;
-  if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0]);
-  startNight(room);
+  const next = room.hunterNext || 'night';
+  if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0], next);
+  room.hunterNext = null;
+  return next === 'day' ? startDay(room) : startNight(room);
 }
 
 function killPlayer(room, target, reason, source) {
-  if (!target.alive) return;
+  if (!target.alive) return false;
+
+  if (source === 'vote' && target.role === 'Prince' && !target.princeShieldUsed) {
+    target.princeShieldUsed = true;
+    target.publicRole = target.role;
+    personalAnim(target.id, 'prince', 'Royal Immunity', 'Kamu adalah Prince. Sekali ini kamu selamat dari voting desa.', { aura: 'amber' });
+    roomAnim(room, 'prince', 'Prince Selamat', `${target.name} ternyata Prince dan selamat dari eliminasi voting satu kali.`, { targetId: target.id });
+    addLog(room, `${target.name} selamat dari voting karena Royal Immunity Prince.`, 'mayor');
+    sendState(room);
+    return false;
+  }
+
   target.alive = false;
   if (target.isMayor) {
     target.isMayor = false;
@@ -692,6 +882,7 @@ function killPlayer(room, target, reason, source) {
   addLog(room, `${target.name} ${reason}.`, 'death');
   if (target.role === 'Hunter' && !room.hunterQueue.includes(target.id)) room.hunterQueue.push(target.id);
   sendState(room);
+  return true;
 }
 
 function checkWin(room) {
@@ -739,6 +930,7 @@ function resetRoom(room, options = {}) {
   room.votes.clear();
   room.mayorVotes.clear();
   room.hunterQueue = [];
+  room.hunterNext = null;
   room.gameOver = null;
   for (const p of room.players.values()) {
     p.role = null;
@@ -748,7 +940,11 @@ function resetRoom(room, options = {}) {
     p.lastInfo = '';
     p.witchHealUsed = false;
     p.witchPoisonUsed = false;
+    p.priestBlessUsed = false;
+    p.princeShieldUsed = false;
+    p.cursedTurned = false;
   }
+  room.nightEvent = null;
   addLog(room, options.auto ? 'Game selesai. Room otomatis kembali ke lobby dan siap dimainkan lagi.' : 'Room direset ke lobby.', 'info');
   narrative(room, 'Lobby Dibuka Lagi', 'Pemain tetap berada di room. Host bisa langsung klik Start Game untuk ronde berikutnya.', 'green');
   sendState(room);
@@ -842,11 +1038,19 @@ function leaveCurrentRoom(socket, silent = false) {
 
 
 io.on('connection', socket => {
-  socket.on('room:create', ({ name, clientId } = {}, cb) => {
+  socket.emit('rooms:list', getPublicRooms());
+
+  socket.on('rooms:list-request', (_data = {}, cb) => {
+    const list = getPublicRooms();
+    socket.emit('rooms:list', list);
+    cb?.({ ok: true, rooms: list });
+  });
+
+  socket.on('room:create', ({ name, roomName, password, clientId } = {}, cb) => {
     leaveCurrentRoom(socket, true);
     const code = makeCode();
     const playerId = cleanClientId(clientId);
-    const room = newRoom(code, playerId, cleanName(name));
+    const room = newRoom(code, playerId, cleanName(name), { roomName, password });
     const p = {
       id: playerId,
       socketId: socket.id,
@@ -857,22 +1061,30 @@ io.on('connection', socket => {
       lastDisconnectAt: null,
       isMayor: false,
       publicRole: null,
+      witchHealUsed: false,
+      witchPoisonUsed: false,
+      priestBlessUsed: false,
+      princeShieldUsed: false,
+      cursedTurned: false,
       avatar: `https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${encodeURIComponent(playerId)}`
     };
     room.players.set(playerId, p);
     rooms.set(code, room);
     bindSocketToPlayer(socket, room, p);
-    addLog(room, `${p.name} membuat room ${code}.`, 'info');
+    addLog(room, `${p.name} membuat room ${code}${room.passwordHash ? ' dengan password' : ''}.`, 'info');
     sendState(room);
+    emitRoomList();
     cb?.({ ok: true, code, playerId });
   });
 
-  socket.on('room:join', ({ code, name, clientId } = {}, cb) => {
+  socket.on('room:join', ({ code, name, password, clientId } = {}, cb) => {
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return cb?.({ ok: false, error: 'Room tidak ditemukan.' });
     const playerId = cleanClientId(clientId);
     const existing = room.players.get(playerId);
     if (existing) return reconnectPlayer(socket, room, existing, name, cb, 'join-reconnect');
+    if (!verifyRoomPassword(room, password)) return cb?.({ ok: false, error: 'Password room salah.' });
+    if ((room.players.size || 0) >= (room.maxPlayers || 16)) return cb?.({ ok: false, error: 'Room sudah penuh.' });
     if (room.phase !== 'lobby') return cb?.({ ok: false, error: 'Game sudah dimulai. Kamu hanya bisa reconnect jika pernah join dari perangkat/browser ini.' });
 
     leaveCurrentRoom(socket, true);
@@ -886,6 +1098,11 @@ io.on('connection', socket => {
       lastDisconnectAt: null,
       isMayor: false,
       publicRole: null,
+      witchHealUsed: false,
+      witchPoisonUsed: false,
+      priestBlessUsed: false,
+      princeShieldUsed: false,
+      cursedTurned: false,
       avatar: `https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${encodeURIComponent(playerId)}`
     };
     room.players.set(playerId, p);
@@ -920,7 +1137,7 @@ io.on('connection', socket => {
         const next = [...room.players.values()].find(x => x.connected);
         if (next) room.hostId = next.id;
       }
-      if (!room.players.size) rooms.delete(room.code);
+      if (!room.players.size) { rooms.delete(room.code); emitRoomList(); }
       else sendState(room);
     } else {
       leaveCurrentRoom(socket);
@@ -968,7 +1185,10 @@ io.on('connection', socket => {
     if (room.phase === 'hunter') {
       room.hunterQueue.shift();
       if (checkWin(room)) return;
-      return startNight(room);
+      const next = room.hunterNext || 'night';
+      if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0], next);
+      room.hunterNext = null;
+      return next === 'day' ? startDay(room) : startNight(room);
     }
   });
 
@@ -1134,14 +1354,17 @@ io.on('connection', socket => {
 
 setInterval(() => {
   const cutoff = Date.now() - 1000 * 60 * 60 * 8;
+  let changedRoomList = false;
   for (const [code, room] of rooms.entries()) {
-    if (![...room.players.values()].some(p => p.connected) && (room.lastEmptyAt || room.createdAt) < Date.now() - RECONNECT_TTL_MS) rooms.delete(code);
+    if (![...room.players.values()].some(p => p.connected) && (room.lastEmptyAt || room.createdAt) < Date.now() - RECONNECT_TTL_MS) { rooms.delete(code); changedRoomList = true; continue; }
     for (const [playerId, player] of room.players.entries()) {
       if (!player.connected && player.lastDisconnectAt && player.lastDisconnectAt < Date.now() - RECONNECT_TTL_MS && room.phase === 'lobby') {
         room.players.delete(playerId);
+        changedRoomList = true;
       }
     }
   }
+  if (changedRoomList) emitRoomList();
 }, 1000 * 60 * 30);
 
 server.listen(PORT, HOST, () => {

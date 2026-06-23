@@ -15,14 +15,24 @@
         <div class="brand-mark">🐺</div>
         <p class="eyebrow">Realtime Social Deduction</p>
         <h1>Werewolf <span>by Ryuu</span></h1>
-        <p class="subtitle">Buat room, bagikan kode, main bareng teman, gunakan role rahasia, voting Kades, animasi sinematik, dan voice room.</p>
+        <p class="subtitle">Buat room publik/berpassword, join dari daftar lobby, main bareng teman, gunakan role rahasia, voting Kades, musik bersama, dan voice room.</p>
         <div class="form-grid">
           <label>Nama pemain<input id="nameInput" maxlength="18" placeholder="Nama kamu" autocomplete="nickname" /></label>
-          <label>Kode room<input id="codeInput" maxlength="5" placeholder="Kosongkan jika buat room" /></label>
+          <label>Nama room<input id="roomNameInput" maxlength="28" placeholder="Contoh: Lobby Ryuu" /></label>
+          <label>Kode room<input id="codeInput" maxlength="5" placeholder="Opsional jika join manual" /></label>
+          <label>Password room<input id="roomPasswordInput" maxlength="64" type="password" placeholder="Opsional, isi jika room terkunci" /></label>
           <button id="createBtn" class="btn primary">Buat Room</button>
-          <button id="joinBtn" class="btn secondary">Join Room</button>
+          <button id="joinBtn" class="btn secondary">Join Manual</button>
         </div>
-        <div class="mini-note">Untuk voice di HP, buka memakai link HTTPS Railway / domain aman.</div>
+        <div class="room-browser glass-lite">
+          <div class="room-browser-head">
+            <div><b>Lobby Publik</b><span>Masuk ke room orang lain tanpa perlu kode manual.</span></div>
+            <button id="refreshRoomsBtn" class="btn secondary small" type="button">Refresh</button>
+          </div>
+          <div id="roomListStatus" class="mini-note">Memuat daftar room...</div>
+          <div id="roomList" class="room-list"></div>
+        </div>
+        <div class="mini-note">Room yang punya password tetap muncul dengan ikon 🔒. Untuk join, isi password atau masukkan saat diminta.</div>
         <div id="resumeBox" class="resume-box hidden">
           <div>
             <b>Session terakhir ditemukan</b>
@@ -39,7 +49,7 @@
     <section id="game" class="screen game-screen hidden">
       <header class="topbar glass">
         <div>
-          <div class="room-code">ROOM <button id="copyCode" class="code-pill">-----</button></div>
+          <div class="room-code"><span id="roomNameLabel">ROOM</span> <button id="copyCode" class="code-pill">-----</button></div>
           <h2 id="phaseTitle">Lobby</h2>
         </div>
         <div class="timer-wrap">
@@ -116,6 +126,23 @@
         </aside>
       </main>
     </section>
+
+
+    <section id="guidePanel" class="guide-panel glass" aria-label="Panduan Cepat">
+      <div class="guide-head">
+        <div><b>📘 Panduan Cepat</b><span>Tekan × kalau sudah paham.</span></div>
+        <button id="guideClose" class="guide-close" type="button" aria-label="Tutup panduan">×</button>
+      </div>
+      <div class="guide-grid">
+        <div><b>Mulai</b><span>Buat room atau pilih Lobby Publik. Room bisa diberi password. Host klik Start Game.</span></div>
+        <div><b>Role</b><span>Baca kartu role kamu. Aksi malam hanya bisa 1 kali per malam.</span></div>
+        <div><b>Seer</b><span>Malam hari pilih 1 pemain saja untuk diterawang. Setelah terkunci, tunggu malam berikutnya.</span></div>
+        <div><b>Vote</b><span>Fase voting: pilih 1 pemain. Jika kamu Kades, vote kamu bernilai 2 suara.</span></div>
+        <div><b>Musik</b><span>Buka 🎧 → ketik judul lagu → Cari YouTube → pilih lagu. Host tekan Room agar terdengar bersama.</span></div>
+        <div><b>Voice</b><span>Buka dari HTTPS, tekan Join Voice, izinkan microphone. Di HP tekan Aktifkan di HP untuk audio musik.</span></div>
+      </div>
+    </section>
+    <button id="guideHelp" class="guide-help hidden" type="button" aria-label="Buka panduan">?</button>
 
     <section id="musicPlayer" class="music-player glass collapsed" aria-label="Music Player">
       <div class="music-now">

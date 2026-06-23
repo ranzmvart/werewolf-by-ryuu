@@ -14,11 +14,15 @@ const ROLE_META = {
   Bodyguard: { team:'village', emoji:'🛡️', aura:'blue', desc:'Menjaga pemain. Bisa berkorban jika target diserang.' },
   Witch: { team:'village', emoji:'🧪', aura:'green', desc:'Punya satu ramuan heal dan satu ramuan poison.' },
   Medium: { team:'village', emoji:'🕯️', aura:'violet', desc:'Bisa membaca chat pemain mati.' },
-  Jester: { team:'jester', emoji:'🃏', aura:'pink', desc:'Menang sendiri jika berhasil dieliminasi voting.' }
+  Jester: { team:'jester', emoji:'🃏', aura:'pink', desc:'Menang sendiri jika berhasil dieliminasi voting.' },
+  'Cursed Villager': { team:'village', emoji:'🌘', aura:'blood', desc:'Jika diserang Werewolf, berubah menjadi Werewolf sekali.' },
+  Prince: { team:'village', emoji:'👑', aura:'amber', desc:'Sekali selamat dari eliminasi voting.' },
+  Priest: { team:'village', emoji:'⛪', aura:'blue', desc:'Sekali per game memberi Holy Shield saat malam.' }
 };
 
 let roomState = null;
 let me = null;
+let latestRoomList = [];
 let timerInterval = null;
 let selectedActionType = 'heal';
 let localStream = null;
@@ -27,20 +31,40 @@ const peers = new Map();
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  login: $('login'), game: $('game'), nameInput: $('nameInput'), codeInput: $('codeInput'), createBtn: $('createBtn'), joinBtn: $('joinBtn'),
-  copyCode: $('copyCode'), phaseTitle: $('phaseTitle'), timer: $('timer'), phaseLine: $('phaseLine'), roleCard: $('roleCard'), privateInfo: $('privateInfo'),
+  login: $('login'), game: $('game'), nameInput: $('nameInput'), roomNameInput: $('roomNameInput'), roomPasswordInput: $('roomPasswordInput'), codeInput: $('codeInput'), createBtn: $('createBtn'), joinBtn: $('joinBtn'), refreshRoomsBtn: $('refreshRoomsBtn'), roomList: $('roomList'), roomListStatus: $('roomListStatus'),
+  copyCode: $('copyCode'), roomNameLabel: $('roomNameLabel'), phaseTitle: $('phaseTitle'), timer: $('timer'), phaseLine: $('phaseLine'), roleCard: $('roleCard'), privateInfo: $('privateInfo'),
   hostBadge: $('hostBadge'), hostTools: $('hostTools'), startBtn: $('startBtn'), skipBtn: $('skipBtn'), resetBtn: $('resetBtn'), nightSec: $('nightSec'), daySec: $('daySec'), voteSec: $('voteSec'), saveSettings: $('saveSettings'),
   narrative: $('narrative'), actionPanel: $('actionPanel'), actionHint: $('actionHint'), targetGrid: $('targetGrid'), players: $('players'), playerCount: $('playerCount'), gameLogs: $('gameLogs'),
   chatLog: $('chatLog'), chatForm: $('chatForm'), chatInput: $('chatInput'), chatChannel: $('chatChannel'),
   cinematic: $('cinematic'), cinematicIcon: $('cinematicIcon'), cinematicTitle: $('cinematicTitle'), cinematicText: $('cinematicText'), toastStack: $('toastStack'),
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
-  resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus')
+  resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
+  guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp')
 };
 
 const savedName = localStorage.getItem('werewolfName');
 if (savedName) els.nameInput.value = savedName;
+const savedRoomName = localStorage.getItem('werewolfRoomName');
+if (savedRoomName && els.roomNameInput) els.roomNameInput.value = savedRoomName;
+
+const GUIDE_KEY = 'ryuuWerewolfGuideHiddenV1';
+function applyGuideVisibility() {
+  const hidden = localStorage.getItem(GUIDE_KEY) === '1';
+  els.guidePanel?.classList.toggle('hidden', hidden);
+  els.guideHelp?.classList.toggle('hidden', !hidden);
+}
+els.guideClose?.addEventListener('click', () => {
+  localStorage.setItem(GUIDE_KEY, '1');
+  applyGuideVisibility();
+});
+els.guideHelp?.addEventListener('click', () => {
+  localStorage.removeItem(GUIDE_KEY);
+  applyGuideVisibility();
+});
+applyGuideVisibility();
 
 renderResumeBox();
+setTimeout(() => requestRoomList(false), 250);
 
 function getOrCreateClientId() {
   let id = localStorage.getItem(CLIENT_ID_KEY);
@@ -107,8 +131,11 @@ function setConnectionStatus(type, text) {
 els.createBtn.onclick = () => {
   const name = els.nameInput.value.trim();
   if (!name) return toast('Nama belum diisi', 'Isi nama pemain dulu.');
+  const roomName = els.roomNameInput?.value?.trim() || `${name}'s Room`;
+  const password = els.roomPasswordInput?.value?.trim() || '';
   localStorage.setItem('werewolfName', name);
-  socket.emit('room:create', { name, clientId }, (res) => {
+  localStorage.setItem('werewolfRoomName', roomName);
+  socket.emit('room:create', { name, roomName, password, clientId }, (res) => {
     if (!res?.ok) return toast('Gagal buat room', res?.error || 'Coba lagi.');
     saveSession(res.code, res.playerId || clientId);
     enterGame();
@@ -120,7 +147,61 @@ els.joinBtn.onclick = () => {
   const code = els.codeInput.value.trim().toUpperCase();
   if (!name || !code) return toast('Data belum lengkap', 'Isi nama dan kode room.');
   localStorage.setItem('werewolfName', name);
-  socket.emit('room:join', { name, code, clientId }, (res) => {
+  const password = els.roomPasswordInput?.value?.trim() || '';
+  socket.emit('room:join', { name, code, password, clientId }, (res) => {
+    if (!res?.ok) return toast('Gagal join room', res?.error || 'Coba lagi.');
+    saveSession(res.code, res.playerId || clientId);
+    enterGame();
+  });
+};
+
+els.refreshRoomsBtn?.addEventListener('click', () => requestRoomList(true));
+
+function requestRoomList(showToast = false) {
+  socket.emit('rooms:list-request', {}, (res) => {
+    if (res?.ok) {
+      latestRoomList = res.rooms || [];
+      renderRoomBrowser();
+      if (showToast) toast('Daftar room diperbarui', `${latestRoomList.length} room ditemukan.`);
+    } else if (showToast) {
+      toast('Gagal refresh room', res?.error || 'Coba lagi.');
+    }
+  });
+}
+
+function renderRoomBrowser() {
+  if (!els.roomList) return;
+  const rooms = latestRoomList || [];
+  if (els.roomListStatus) {
+    els.roomListStatus.textContent = rooms.length ? `${rooms.length} room tersedia. Pilih Join untuk masuk.` : 'Belum ada room aktif. Buat room baru sebagai host.';
+  }
+  els.roomList.innerHTML = rooms.map(room => {
+    const locked = room.hasPassword ? '🔒' : '🌐';
+    const phase = phaseName(room.phase);
+    const disabled = room.phase !== 'lobby' ? 'disabled' : '';
+    const status = room.phase === 'lobby' ? 'Bisa join' : 'Sudah mulai';
+    return `<div class="room-card ${room.hasPassword ? 'locked' : ''}">
+      <div class="room-card-main">
+        <div class="room-card-title"><span>${locked}</span><b>${escapeHtml(room.name || 'Lobby Werewolf')}</b></div>
+        <div class="room-card-meta">Kode ${escapeHtml(room.code)} • Host ${escapeHtml(room.hostName || '-')} • ${escapeHtml(phase)}</div>
+        <div class="room-card-stats"><span>${room.connectedCount || 0}/${room.maxPlayers || 16} online</span><span>${room.playerCount || 0} pemain</span><span>${status}</span></div>
+      </div>
+      <button class="btn primary small" ${disabled} onclick="joinListedRoom('${room.code}', ${room.hasPassword ? 'true' : 'false'})">Join</button>
+    </div>`;
+  }).join('');
+}
+
+window.joinListedRoom = (code, hasPassword) => {
+  const name = els.nameInput.value.trim();
+  if (!name) return toast('Nama belum diisi', 'Isi nama pemain dulu sebelum join room.');
+  let password = els.roomPasswordInput?.value?.trim() || '';
+  if (hasPassword && !password) {
+    password = prompt('Room ini memakai password. Masukkan password room:') || '';
+  }
+  localStorage.setItem('werewolfName', name);
+  els.codeInput.value = code;
+  if (els.roomPasswordInput && password) els.roomPasswordInput.value = password;
+  socket.emit('room:join', { name, code, password, clientId }, (res) => {
     if (!res?.ok) return toast('Gagal join room', res?.error || 'Coba lagi.');
     saveSession(res.code, res.playerId || clientId);
     enterGame();
@@ -178,6 +259,7 @@ els.chatForm.onsubmit = (e) => {
 
 socket.on('connect', () => {
   setConnectionStatus('online', 'Online');
+  requestRoomList(false);
   // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
   if (!els.game.classList.contains('hidden') && getSession()?.code) {
     reconnectFromSavedSession(false);
@@ -187,6 +269,11 @@ socket.on('connect', () => {
 socket.io.on('reconnect_attempt', () => setConnectionStatus('reconnecting', 'Reconnecting...'));
 socket.on('disconnect', () => setConnectionStatus('offline', 'Offline'));
 socket.on('connect_error', () => setConnectionStatus('offline', 'Koneksi gagal'));
+
+socket.on('rooms:list', (rooms) => {
+  latestRoomList = Array.isArray(rooms) ? rooms : [];
+  renderRoomBrowser();
+});
 
 socket.on('room:state', (state) => {
   roomState = state;
@@ -226,8 +313,9 @@ socket.on('werewolf:choice', ({ actorName, targetName }) => toast('Bisikan Werew
 function renderAll() {
   if (!roomState) return;
   els.copyCode.textContent = roomState.code;
+  if (els.roomNameLabel) els.roomNameLabel.textContent = roomState.name ? roomState.name : 'ROOM';
   els.phaseTitle.textContent = phaseName(roomState.phase);
-  els.phaseLine.textContent = phaseHint(roomState.phase);
+  els.phaseLine.textContent = roomState.nightEvent ? `${phaseHint(roomState.phase)} • ${roomState.nightEvent.emoji} ${roomState.nightEvent.name}` : phaseHint(roomState.phase);
   els.playerCount.textContent = roomState.players.length;
   els.hostBadge.classList.toggle('hidden', !me?.isHost);
   els.hostTools.classList.toggle('hidden', !me?.isHost);
@@ -280,6 +368,9 @@ function renderRole() {
   if (me.isMayor) extra.push('👑 Kamu adalah Kepala Desa. Vote kamu bernilai 2 suara.');
   if (me.lastInfo) extra.push(`🔎 ${me.lastInfo}`);
   if (me.role === 'Witch') extra.push(`🧪 Heal: ${me.witchHealUsed ? 'habis' : 'tersedia'} • Poison: ${me.witchPoisonUsed ? 'habis' : 'tersedia'}`);
+  if (me.role === 'Priest') extra.push(`⛪ Holy Shield: ${me.priestBlessUsed ? 'habis' : 'tersedia'}`);
+  if (me.role === 'Prince') extra.push(`👑 Royal Immunity: ${me.princeShieldUsed ? 'sudah terpakai' : 'masih aktif'}`);
+  if (me.role === 'Cursed Villager') extra.push(me.cursedTurned ? '🌘 Kutukan sudah bangkit. Kamu kini Werewolf.' : '🌘 Kutukan belum bangkit. Jika diserang Werewolf, kamu berubah.');
   els.privateInfo.innerHTML = extra.length ? extra.map(escapeHtml).join('<br>') : 'Informasi rahasia role akan muncul di sini.';
 }
 
@@ -320,20 +411,28 @@ function renderActions() {
   }
   if (roomState.phase === 'night' && me.alive) {
     const role = me.role;
-    if (role === 'Werewolf' || role === 'Alpha Werewolf') {
-      hint = 'Werewolf: pilih target untuk dibunuh.';
-      buttons = aliveOthers.filter(p => !isWolf(p.revealedRole)).map(p => actionButton(p, 'wolfKill'));
+    const eventText = me.nightEvent ? ` Event: ${me.nightEvent.emoji} ${me.nightEvent.name}.` : '';
+    if (me.actionDone) {
+      hint = 'Aksi malam kamu sudah terkunci. Tunggu sampai pagi.' + eventText;
+      buttons = [];
+    } else if (role === 'Werewolf' || role === 'Alpha Werewolf') {
+      hint = 'Werewolf: pilih 1 target untuk dibunuh. Setelah dipilih tidak bisa diganti.' + eventText;
+      const wolfIds = new Set(me.wolfTeamIds || []);
+      buttons = aliveOthers.filter(p => !wolfIds.has(p.id)).map(p => actionButton(p, 'wolfKill'));
     } else if (role === 'Seer') {
-      hint = 'Seer: pilih satu pemain untuk diterawang.';
+      hint = 'Seer: pilih 1 pemain untuk diterawang. Hanya 1 kali setiap malam.' + eventText;
       buttons = aliveOthers.map(p => actionButton(p, 'seer'));
     } else if (role === 'Doctor') {
-      hint = 'Doctor: pilih pemain untuk dilindungi.';
+      hint = 'Doctor: pilih 1 pemain untuk dilindungi. Hanya 1 kali setiap malam.' + eventText;
       buttons = aliveTargets.map(p => actionButton(p, 'doctor'));
     } else if (role === 'Bodyguard') {
-      hint = 'Bodyguard: pilih pemain lain untuk dijaga.';
+      hint = 'Bodyguard: pilih 1 pemain lain untuk dijaga. Hanya 1 kali setiap malam.' + eventText;
       buttons = aliveOthers.map(p => actionButton(p, 'guard'));
+    } else if (role === 'Priest') {
+      hint = me.priestBlessUsed ? 'Holy Shield kamu sudah habis.' : 'Priest: pilih 1 pemain untuk Holy Shield. Skill ini hanya sekali per game.' + eventText;
+      if (!me.priestBlessUsed) buttons = aliveTargets.map(p => actionButton(p, 'priest'));
     } else if (role === 'Witch') {
-      hint = 'Witch: pilih ramuan dulu, lalu target.';
+      hint = 'Witch: pilih ramuan dulu, lalu target. Hanya 1 ramuan per malam.' + eventText;
       const controls = document.createElement('div');
       controls.className = 'voice-actions';
       controls.innerHTML = `<button class="btn secondary small" id="healMode" ${me.witchHealUsed ? 'disabled' : ''}>Heal</button><button class="btn secondary small" id="poisonMode" ${me.witchPoisonUsed ? 'disabled' : ''}>Poison</button>`;
@@ -342,11 +441,15 @@ function renderActions() {
         $('healMode')?.addEventListener('click', () => { selectedActionType = 'heal'; toast('Mode Witch', 'Pilih target untuk Heal.'); });
         $('poisonMode')?.addEventListener('click', () => { selectedActionType = 'poison'; toast('Mode Witch', 'Pilih target untuk Poison.'); });
       });
-      buttons = aliveTargets.map(p => actionButton(p, 'witch'));
+      if (!me.witchHealUsed || !me.witchPoisonUsed) buttons = aliveTargets.map(p => actionButton(p, 'witch'));
     } else if (role === 'Medium') {
-      hint = 'Medium: kamu bisa membaca chat Dead/Medium. Pakai informasi arwah saat siang.';
+      hint = 'Medium: kamu bisa membaca chat Dead/Medium. Pakai informasi arwah saat siang.' + eventText;
+    } else if (role === 'Cursed Villager') {
+      hint = 'Cursed Villager: tidak punya aksi aktif. Jika diserang Werewolf, kutukan bisa mengubahmu.' + eventText;
+    } else if (role === 'Prince') {
+      hint = 'Prince: tidak punya aksi malam. Kamu bisa selamat dari voting satu kali.' + eventText;
     } else {
-      hint = 'Malam ini kamu tidak punya aksi. Perhatikan dan tunggu pagi.';
+      hint = 'Malam ini kamu tidak punya aksi. Perhatikan dan tunggu pagi.' + eventText;
     }
   }
   if (roomState.phase === 'day') hint = 'Diskusikan siapa yang mencurigakan sebelum voting.';
@@ -385,6 +488,7 @@ window.doAction = (mode, id) => {
   if (mode === 'seer') return socket.emit('night:action', { targetId: id, type: 'scan' });
   if (mode === 'doctor') return socket.emit('night:action', { targetId: id, type: 'protect' });
   if (mode === 'guard') return socket.emit('night:action', { targetId: id, type: 'guard' });
+  if (mode === 'priest') return socket.emit('night:action', { targetId: id, type: 'bless' });
   if (mode === 'witch') return socket.emit('night:action', { targetId: id, type: selectedActionType || 'heal' });
 };
 
@@ -404,7 +508,7 @@ function isWolf(role) { return role === 'Werewolf' || role === 'Alpha Werewolf';
 
 function showCinematic(a) {
   const map = {
-    roleReveal:'🎭', mayor:'👑', nightRole:'🌙', attack:'🐺', death:'💀', saved:'✨', seer:'🔮', heal:'💉', guard:'🛡️', poison:'🧪', vote:'🗳️', execution:'⚖️', hunter:'🏹', hunterShot:'🏹', victory:'🏆', defeat:'🌑', wolfWin:'🐺', villageWin:'🌅', jesterWin:'🃏'
+    roleReveal:'🎭', mayor:'👑', nightRole:'🌙', attack:'🐺', death:'💀', saved:'✨', seer:'🔮', heal:'💉', guard:'🛡️', poison:'🧪', vote:'🗳️', execution:'⚖️', hunter:'🏹', hunterShot:'🏹', victory:'🏆', defeat:'🌑', wolfWin:'🐺', villageWin:'🌅', jesterWin:'🃏', blocked:'⛔', cursed:'🌘', prince:'👑', bless:'⛪'
   };
   els.cinematicIcon.textContent = map[a.type] || '🐺';
   els.cinematicTitle.textContent = a.title || 'Event';

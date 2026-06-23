@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "2.4.1",
-  "description": "Werewolf Online by Ryuu - Search Only Shared Music, YouTube Search, Voice, Reconnect, Auto Reset",
+  "version": "2.6.0",
+  "description": "Werewolf Online by Ryuu - Final Room Browser, Password Lobby, Balance, Guide, YouTube Music, Voice, Reconnect, Auto Reset",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
