@@ -1,13 +1,14 @@
-# Werewolf by Ryuu v4.2 — Hard Reconnect + Kades Fix
+# Werewolf by Ryuu v4.3 - Role Random + Shared Music Fix
 
-Patch fokus:
-- Fix crash/loop setelah Vote Kepala Desa.
-- Menambahkan handler fase malam yang aman agar server tidak restart saat Kades selesai.
-- Auto reconnect tidak lagi spam setelah pemain sudah berhasil kembali.
-- Status reconnect kembali Online saat room state diterima.
-- Vote Kades satu pemain hanya bisa satu kali per ronde.
-- Jika semua pemain sudah vote Kades, fase lanjut ke malam secara paksa/aman.
-- Reconnect player/host dibuat idempotent agar tidak log spam dan tidak mengulang state.
-- Semua fitur lama tetap dipertahankan.
+Update ini fokus memperbaiki role yang muncul sebelum game dimulai, random role, dan music player di laptop.
 
-Upload isi folder ini ke root GitHub repo, bukan folder ZIP-nya.
+## Fix utama
+
+- Role tidak lagi muncul saat baru masuk lobby sebelum host menekan Start Game.
+- State role lama dari room persistent akan dibersihkan otomatis kalau room masih lobby / belum mulai.
+- Random role memakai crypto-backed shuffle agar hasil acak lebih kuat.
+- Music shared room diperbaiki agar state lagu host lebih cepat tersinkron saat masuk/reconnect.
+- Music floating di laptop diperbaiki: tombol play, search, Room, Preview, Radio, volume bisa diklik normal; drag hanya dari tombol/head area.
+- Tampilan role empty dibuat lebih jelas di HP/laptop.
+
+Upload isi folder ini ke repo GitHub, bukan folder ZIP-nya.

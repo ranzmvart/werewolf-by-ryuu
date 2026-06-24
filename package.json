@@ -1,6 +1,6 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Werewolf by Ryuu v4.2 Hard Reconnect Kades Fix",
   "main": "server.js",
   "type": "commonjs",

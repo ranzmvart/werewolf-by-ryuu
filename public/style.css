@@ -1453,3 +1453,32 @@ input,select,textarea{min-height:42px;}
 @media (max-width: 420px){
   .topbar{top:4px}.game-tabbar{top:88px}.room-code span{max-width:48vw}.timer-wrap{grid-template-columns:auto 1fr}.reconnect-status{grid-column:1/-1;justify-self:start}.chat-log{height:calc(100dvh - 300px);min-height:300px}.target{font-size:.9rem}.music-player:not(.collapsed){width:calc(100vw - 16px)!important;left:8px!important}.crate-opening-shell{padding:12px}.case-item{min-width:86px}.case-item img{width:44px;height:44px}
 }
+
+/* === v4.3 Role + Music Desktop Fix === */
+.music-player button,
+.music-player input,
+.music-player label,
+.music-player select,
+.music-player textarea,
+.music-controls,
+.music-drawer,
+.song-row{
+  touch-action:manipulation;
+}
+.music-player:not(.collapsed) .music-controls,
+.music-player:not(.collapsed) .music-drawer,
+.music-player:not(.collapsed) .music-volume{
+  cursor:auto;
+  pointer-events:auto;
+}
+.music-player:not(.collapsed) .music-title-wrap{cursor:grab;}
+.music-player.collapsed .music-cover{cursor:grab;}
+.role-card.empty{
+  display:grid;
+  place-items:center;
+  gap:6px;
+  min-height:190px;
+  text-align:center;
+}
+.role-card.empty b{font-size:1.05rem;color:#e5e7eb;}
+.role-card.empty span{font-size:.82rem;color:#94a3b8;max-width:220px;line-height:1.45;}

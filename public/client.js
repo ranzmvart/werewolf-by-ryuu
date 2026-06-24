@@ -534,6 +534,7 @@ socket.on('room:state', (state) => {
   if (socket.connected) setConnectionStatus('online', 'Online');
   const prevPhase = roomState?.phase;
   roomState = state;
+  if (state?.music && window.receiveSharedRoomMusic) window.receiveSharedRoomMusic(state.music, 'room-state');
   if (state?.code) currentRoomCode = state.code;
   if (state?.phase !== 'mayorVote') mayorVoteLockedTarget = null;
   if (prevPhase !== state?.phase && ['mayorVote','night','voting','hunter'].includes(state?.phase)) setGameTab('actions', true);
@@ -616,10 +617,11 @@ function renderTimer() {
 }
 
 function renderRole() {
-  if (!me?.role) {
+  const roleVisible = !!(roomState?.gameStarted && roomState?.phase !== 'lobby' && me?.role);
+  if (!roleVisible) {
     els.roleCard.className = 'role-card empty';
-    els.roleCard.textContent = 'Belum ada role';
-    els.privateInfo.textContent = '';
+    els.roleCard.innerHTML = '<b>Belum ada role</b><span>Role akan diacak setelah host menekan Start Game.</span>';
+    els.privateInfo.textContent = 'Belum ada informasi rahasia. Tunggu game dimulai.';
     return;
   }
   const meta = ROLE_META[me.role] || me.roleMeta || { emoji:'', aura:'', desc:'' };
@@ -2017,7 +2019,12 @@ window.addEventListener('beforeunload', () => {
     let drag = null;
     const start = (e) => {
       const target = e.target;
-      const canDrag = musicEls.player.classList.contains('collapsed') || target === musicEls.toggle || target.closest('.music-now');
+      // Desktop fix: do not treat buttons/inputs/search/player controls as drag handles.
+      // Drag only from the small cover button while collapsed, or from the title area when open.
+      const isInteractive = target.closest('button,input,label,select,textarea,.music-controls,.music-drawer,.music-volume,.song-row');
+      const canDrag = musicEls.player.classList.contains('collapsed')
+        ? (target === musicEls.toggle || target.closest('.music-cover'))
+        : (!isInteractive && (target.closest('.music-title-wrap') || target.closest('.music-now')));
       if (!canDrag) return;
       drag = {
         id: e.pointerId,
@@ -2102,6 +2109,7 @@ window.addEventListener('beforeunload', () => {
     if (files.length) toast('Playlist ditambah', `${files.length} lagu lokal masuk playlist. Lagu lokal tidak bisa diputar bersama.`);
   });
 
+  window.receiveSharedRoomMusic = receiveRoomMusic;
   socket.on('music:room-state', (state) => receiveRoomMusic(state, 'socket'));
   socket.on('connect', () => {
     if (roomState?.code) socket.emit('music:room-request');

@@ -694,29 +694,34 @@ function roomPublic(room) {
 function privateState(room, id) {
   const p = room.players.get(id);
   if (!p) return null;
+  // Hard guard: role must NEVER leak before the host starts the game.
+  // Some restored/persisted rooms can still have old role values in player objects;
+  // the client must only receive role data after gameStarted is true and phase is not lobby.
+  const roleVisible = !!(room.gameStarted && room.phase !== 'lobby' && p.role);
+  const visibleRole = roleVisible ? p.role : null;
   return {
     id: p.id,
     name: p.name,
-    role: p.role,
-    roleMeta: p.role ? ROLE_META[p.role] : null,
+    role: visibleRole,
+    roleMeta: visibleRole ? ROLE_META[visibleRole] : null,
     alive: p.alive,
     isHost: p.id === room.hostId,
     isMayor: !!p.isMayor,
-    witchHealUsed: !!p.witchHealUsed,
-    witchPoisonUsed: !!p.witchPoisonUsed,
-    priestBlessUsed: !!p.priestBlessUsed,
-    princeShieldUsed: !!p.princeShieldUsed,
-    cursedTurned: !!p.cursedTurned,
-    lastInfo: p.lastInfo || '',
-    actionDone: [...room.nightActions.values()].some(a => a.actor === p.id),
-    wolfTeamIds: ROLE_META[p.role]?.team === 'werewolf' ? [...room.players.values()].filter(x => x.alive && ROLE_META[x.role]?.team === 'werewolf').map(x => x.id) : [],
-    nightEvent: room.nightEvent || null,
+    witchHealUsed: roleVisible ? !!p.witchHealUsed : false,
+    witchPoisonUsed: roleVisible ? !!p.witchPoisonUsed : false,
+    priestBlessUsed: roleVisible ? !!p.priestBlessUsed : false,
+    princeShieldUsed: roleVisible ? !!p.princeShieldUsed : false,
+    cursedTurned: roleVisible ? !!p.cursedTurned : false,
+    lastInfo: roleVisible ? (p.lastInfo || '') : '',
+    actionDone: roleVisible ? [...room.nightActions.values()].some(a => a.actor === p.id) : false,
+    wolfTeamIds: ROLE_META[visibleRole]?.team === 'werewolf' ? [...room.players.values()].filter(x => x.alive && ROLE_META[x.role]?.team === 'werewolf').map(x => x.id) : [],
+    nightEvent: roleVisible ? (room.nightEvent || null) : null,
     voteTarget: room.votes.get(p.id) || null,
     mayorVoteTarget: room.mayorVotes.get(p.id) || null,
     profile: publicProfile(profileForAccount(p.accountKey)),
     equippedPower: p.power || null,
-    remainingActions: remainingNightActions(room, p),
-    actionLimits: getActionLimits(room, p),
+    remainingActions: roleVisible ? remainingNightActions(room, p) : {},
+    actionLimits: roleVisible ? getActionLimits(room, p) : {},
     voteWeight: voteWeight(p, room)
   };
 }
@@ -832,7 +837,8 @@ function roleDeckFor(count) {
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    // Use crypto-backed randomness so role distribution is less predictable than Math.random().
+    const j = crypto.randomInt(0, i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -859,24 +865,8 @@ function startGame(room) {
   room.gameOver = null;
   room.rewardsGranted = false;
   for (const p of room.players.values()) {
-    p.role = null;
+    clearPlayerRoundRoleState(p, false);
     p.alive = p.connected;
-    p.isMayor = false;
-    p.publicRole = null;
-    p.lastInfo = '';
-    p.witchHealUsed = false;
-    p.witchPoisonUsed = false;
-    p.priestBlessUsed = false;
-    p.princeShieldUsed = false;
-    p.cursedTurned = false;
-    p.roundStats = defaultRoundStats();
-    p.powerUsedLucky = false;
-    p.powerUsedCloak = false;
-    p.powerConsumed = false;
-    p.consumedPowerId = null;
-    p.powerVoteDay = null;
-    p.wolfDoubleDay = null;
-    applyProfileToPlayer(p);
   }
   room.nightEvent = null;
   const deck = roleDeckFor(players.length);
@@ -1466,6 +1456,29 @@ function endGame(room, winningTeam, reason) {
   }, 25000);
 }
 
+
+function clearPlayerRoundRoleState(p, keepAlive = true) {
+  if (!p) return;
+  p.role = null;
+  if (keepAlive) p.alive = true;
+  p.isMayor = false;
+  p.publicRole = null;
+  p.lastInfo = '';
+  p.witchHealUsed = false;
+  p.witchPoisonUsed = false;
+  p.priestBlessUsed = false;
+  p.princeShieldUsed = false;
+  p.cursedTurned = false;
+  p.roundStats = defaultRoundStats();
+  p.powerUsedLucky = false;
+  p.powerUsedCloak = false;
+  p.powerConsumed = false;
+  p.consumedPowerId = null;
+  p.powerVoteDay = null;
+  p.wolfDoubleDay = null;
+  applyProfileToPlayer(p);
+}
+
 function resetRoom(room, options = {}) {
   clearRoomTimer(room);
   clearAutoResetTimer(room);
@@ -1481,22 +1494,7 @@ function resetRoom(room, options = {}) {
   room.hunterNext = null;
   room.gameOver = null;
   room.rewardsGranted = false;
-  for (const p of room.players.values()) {
-    p.role = null;
-    p.alive = true;
-    p.isMayor = false;
-    p.publicRole = null;
-    p.lastInfo = '';
-    p.witchHealUsed = false;
-    p.witchPoisonUsed = false;
-    p.priestBlessUsed = false;
-    p.princeShieldUsed = false;
-    p.cursedTurned = false;
-    p.roundStats = defaultRoundStats();
-    p.powerUsedLucky = false;
-    p.powerUsedCloak = false;
-    applyProfileToPlayer(p);
-  }
+  for (const p of room.players.values()) clearPlayerRoundRoleState(p, true);
   room.nightEvent = null;
   addLog(room, options.auto ? 'Game selesai. Room otomatis kembali ke lobby dan siap dimainkan lagi.' : 'Room direset ke lobby.', 'info');
   narrative(room, 'Lobby Dibuka Lagi', 'Pemain tetap berada di room. Host bisa langsung klik Start Game untuk ronde berikutnya.', 'green');
@@ -2275,6 +2273,12 @@ function hydrateRoom(raw) {
   room.autoResetAt = raw.autoResetAt || null;
   room.settings = { ...room.settings, ...(raw.settings || {}) };
   room.players = new Map((raw.players || []).map(p => [p.id, { ...p, socketId: null, connected: false, lastDisconnectAt: Date.now() }]));
+  // If a room is restored as lobby/not-started, wipe any stale role state from older versions.
+  if (!room.gameStarted || room.phase === 'lobby') {
+    room.phase = 'lobby';
+    room.gameStarted = false;
+    for (const player of room.players.values()) clearPlayerRoundRoleState(player, true);
+  }
   room.logs = Array.isArray(raw.logs) ? raw.logs.slice(-100) : [];
   room.nightActions = new Map(raw.nightActions || []);
   room.votes = new Map(raw.votes || []);
@@ -2324,6 +2328,7 @@ function resumeRoomTimers(room, fromBoot = false) {
     room.phase = 'lobby';
     room.mayorVotes?.clear?.();
     room.mayorResolved = false;
+    for (const player of room.players.values()) clearPlayerRoundRoleState(player, true);
   }
   if (room.phase === 'lobby') { sendState(room); return; }
   if (!room.gameStarted || ![...room.players.values()].some(p => p.role)) {
