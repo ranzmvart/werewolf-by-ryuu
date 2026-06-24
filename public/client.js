@@ -1083,13 +1083,14 @@ function renderCrates() {
 let crateAnimationTimer = null;
 function buildFakeRewardPool(finalReward, crate) {
   const rarities = ['common','rare','common','epic','common','rare','legendary','common','rare','epic','common','mythic'];
-  const names = ['Moon Shard','Fang Token','Village Coin','Mystic Dust','Hunter Mark','Guard Core','Royal Glow','Blood Spark','Seer Prism','Lucky Drop','Shadow Chip','Legend Core'];
+  const names = ['Moon Shard','Fang Token','Village Coin','Mystic Dust','Hunter Mark','Guard Core','Royal Glow','Blood Spark','Seer Prism','Lucky Drop','Shadow Chip','Legend Core','Night Crystal','Wolf Crest','Oracle Glass','Royal Sigil'];
   const pool = [];
-  for (let i = 0; i < 44; i++) {
+  // Pool dibuat panjang agar di HP tidak pernah terlihat kosong saat rail berhenti.
+  for (let i = 0; i < 72; i++) {
     const rarity = rarities[(i + Math.floor(Math.random()*rarities.length)) % rarities.length];
     pool.push({ rarity, name: names[i % names.length], asset: rarityAsset(rarity) });
   }
-  const finalIndex = 38;
+  const finalIndex = 55;
   pool[finalIndex] = { rarity: finalReward.rarity || 'rare', name: finalReward.name || 'Reward', asset: rewardAsset(finalReward), final: true };
   return { pool, finalIndex };
 }
@@ -1107,12 +1108,20 @@ function showCrateOpening(crateId, reward, done) {
   els.caseRail.style.transition = 'none';
   els.caseRail.style.transform = 'translate3d(0,0,0)';
   els.caseRail.innerHTML = pool.map((it, idx) => `<div class="case-item rarity-${escapeHtml(it.rarity)} ${it.final ? 'final-slot' : ''}"><img src="${it.asset}" alt="item"><b>${escapeHtml(it.name)}</b><span>${escapeHtml(it.rarity)}</span></div>`).join('');
+
   requestAnimationFrame(() => {
-    const itemW = 126;
-    const center = Math.max(0, (els.crateOpening.querySelector('.case-spinner')?.clientWidth || 580) / 2 - itemW / 2);
-    const jitter = Math.floor(Math.random() * 42) - 21;
+    const spinner = els.crateOpening.querySelector('.case-spinner');
+    const firstItem = els.caseRail.querySelector('.case-item');
+    const railStyle = window.getComputedStyle(els.caseRail);
+    const gap = parseFloat(railStyle.columnGap || railStyle.gap || '0') || 0;
+    const itemW = Math.max(72, (firstItem?.getBoundingClientRect().width || 112) + gap);
+    const spinnerW = spinner?.clientWidth || Math.min(window.innerWidth - 28, 720);
+    const center = Math.max(0, spinnerW / 2 - itemW / 2);
+    const jitter = Math.floor(Math.random() * Math.min(34, itemW * .34)) - Math.floor(Math.min(34, itemW * .34) / 2);
     const distance = -(finalIndex * itemW) + center + jitter;
-    els.caseRail.style.transition = 'transform 4.6s cubic-bezier(.08,.72,.12,1)';
+    // Force reflow supaya transisi selalu dimulai dari awal, termasuk di mobile Chrome.
+    void els.caseRail.offsetWidth;
+    els.caseRail.style.transition = 'transform 4.8s cubic-bezier(.07,.74,.11,1)';
     els.caseRail.style.transform = `translate3d(${distance}px,0,0)`;
   });
   crateAnimationTimer = setTimeout(() => {
@@ -1125,7 +1134,7 @@ function showCrateOpening(crateId, reward, done) {
     els.crateResult.classList.remove('hidden');
     if (['legendary','mythic'].includes(String(reward.rarity))) launchConfetti();
     done?.();
-  }, 4900);
+  }, 5100);
 }
 function closeCrateOpening() {
   clearTimeout(crateAnimationTimer);
@@ -1922,7 +1931,94 @@ window.addEventListener('beforeunload', () => {
     }
   }
 
-  musicEls.toggle.addEventListener('click', () => musicEls.player.classList.toggle('collapsed'));
+  let musicDragMoved = false;
+  function clampMusicFloat(left, top) {
+    const player = musicEls.player;
+    const rect = player.getBoundingClientRect();
+    const margin = 10;
+    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+    return {
+      left: Math.min(Math.max(margin, left), maxLeft),
+      top: Math.min(Math.max(margin, top), maxTop)
+    };
+  }
+  function setMusicFloatPosition(left, top, save = true) {
+    const p = clampMusicFloat(left, top);
+    musicEls.player.style.left = `${p.left}px`;
+    musicEls.player.style.top = `${p.top}px`;
+    musicEls.player.style.right = 'auto';
+    musicEls.player.style.bottom = 'auto';
+    musicEls.player.style.transform = 'none';
+    musicEls.player.classList.add('free-float');
+    if (save) localStorage.setItem('ryuuMusicFloatPos', JSON.stringify(p));
+  }
+  function restoreMusicFloatPosition() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ryuuMusicFloatPos') || 'null');
+      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) return setMusicFloatPosition(saved.left, saved.top, false);
+    } catch {}
+    const w = musicEls.player.classList.contains('collapsed') ? 62 : Math.min(520, window.innerWidth - 20);
+    setMusicFloatPosition(window.innerWidth - w - 14, window.innerHeight - 76, false);
+  }
+  function initMusicDrag() {
+    restoreMusicFloatPosition();
+    window.addEventListener('resize', () => {
+      const rect = musicEls.player.getBoundingClientRect();
+      setMusicFloatPosition(rect.left, rect.top, false);
+    });
+    let drag = null;
+    const start = (e) => {
+      const target = e.target;
+      const canDrag = musicEls.player.classList.contains('collapsed') || target === musicEls.toggle || target.closest('.music-now');
+      if (!canDrag) return;
+      drag = {
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+        left: musicEls.player.getBoundingClientRect().left,
+        top: musicEls.player.getBoundingClientRect().top,
+        moved: false
+      };
+      musicDragMoved = false;
+      musicEls.player.setPointerCapture?.(e.pointerId);
+    };
+    const move = (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 7) {
+        drag.moved = true;
+        musicDragMoved = true;
+        musicEls.player.classList.add('dragging');
+      }
+      if (drag.moved) {
+        e.preventDefault();
+        setMusicFloatPosition(drag.left + dx, drag.top + dy, false);
+      }
+    };
+    const end = (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      musicEls.player.classList.remove('dragging');
+      const rect = musicEls.player.getBoundingClientRect();
+      setMusicFloatPosition(rect.left, rect.top, true);
+      setTimeout(() => { musicDragMoved = false; }, 80);
+      drag = null;
+    };
+    musicEls.player.addEventListener('pointerdown', start);
+    musicEls.player.addEventListener('pointermove', move);
+    musicEls.player.addEventListener('pointerup', end);
+    musicEls.player.addEventListener('pointercancel', end);
+  }
+  initMusicDrag();
+  musicEls.toggle.addEventListener('click', (e) => {
+    if (musicDragMoved) { e.preventDefault(); return; }
+    musicEls.player.classList.toggle('collapsed');
+    requestAnimationFrame(() => {
+      const rect = musicEls.player.getBoundingClientRect();
+      setMusicFloatPosition(rect.left, rect.top, true);
+    });
+  });
   musicEls.play.addEventListener('click', togglePlay);
   musicEls.prev.addEventListener('click', () => move(-1));
   musicEls.next.addEventListener('click', () => move(1));

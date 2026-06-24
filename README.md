@@ -1,90 +1,22 @@
-# Werewolf by Ryuu v3.4 — Cinematic Crate + Modern Assets Final
+# Werewolf by Ryuu v3.8 Crate + Floating Music Polish
 
-Versi ini melanjutkan v3.3 dan menambahkan polish visual modern:
+Versi ini mempertahankan semua fitur v3.7, lalu memperbaiki dua bagian utama:
 
-- Animasi open crate model spinner/case opening seperti game modern.
-- Reward reveal dengan rarity Common, Rare, Epic, Legendary, Mythic.
-- Notifikasi kanan saat reward masuk inventory.
-- Asset SVG 3D-style buatan sendiri di `public/assets/`, bukan emoji.
-- Cinematic role/action lebih hidup memakai asset visual: werewolf attack, seer orb, doctor drone, shield, trophy, rarity core.
-- Shop dan inventory lebih visual dengan ikon asset.
-- Semua fitur lama tetap ada: login PIN, profile, shop, inventory, leaderboard, crate/gacha, friends, invite lobby, room password, reconnect, persistent rooms, music shared, voice, Kades x2, consumable power item.
+- Crate opening di HP lebih stabil: rail tidak kosong setelah spin, asset reward lebih kecil, teks tidak tertutup.
+- Music player menjadi floating draggable: saat minimize hanya tampil tombol kecil, bisa digeser, dan tidak menutupi halaman.
 
-## Deploy Railway
+## Deploy
 
-Upload isi folder ini ke root repo GitHub:
+Upload isi folder ini ke root repo GitHub Railway kamu:
 
-```txt
+```text
 public/
 package.json
 railway.json
 Dockerfile
-README.md
 server.js
+README.md
+ASSET_CREDITS.md
 ```
 
-Railway akan redeploy otomatis.
-
-## Persistent Data
-
-Pastikan Railway Volume mount ke:
-
-```txt
-/app/data
-```
-
-File yang disimpan permanen:
-
-```txt
-/app/data/players.json
-/app/data/rooms.json
-```
-
-## Owner Account
-
-```txt
-Username: ryuu
-PIN: 291206
-```
-
-
-## v3.5 TCG Role/Skin Asset Update
-
-Versi ini menambahkan asset visual TCG-style untuk role, skin, dan effect skill:
-
-- Role cards: Werewolf, Alpha Werewolf, Villager, Seer, Doctor, Hunter, Bodyguard, Witch, Medium, Jester, Cursed Villager, Prince, Priest, Lycan, Sorcerer, Tough Guy.
-- Skin cards: Nocturne Wolf, Blood Moon Alpha, Silver Fang, Village Guardian, Royal Villager, Astral Seer, Neon Medic, Void Witch, Raven Hunter, dan lainnya.
-- Effect cards: Werewolf Maul, Seer Vision, Doctor Pulse, Guard Wall, Witch Poison, Hunter Shot, Mayor Crown, Blood Moon, Double Vision, Death Smoke, Victory Nova.
-
-Asset ada di:
-
-```text
-public/assets/tcg/
-```
-
-Manifest asset ada di:
-
-```text
-public/assets/tcg/asset-manifest.json
-```
-
-Role card di UI sudah diganti dari emoji menjadi kartu visual TCG-style.
-
-
-## v3.6 Responsive Clean UI
-
-Update ini fokus ke tampilan agar lebih rapi di laptop dan HP tanpa mengubah fitur/gameplay:
-
-- Layout laptop lebih proporsional dan tidak terlalu penuh.
-- Layout HP satu kolom, tombol lebih nyaman disentuh.
-- Shop, inventory, leaderboard, profile, crate, music, role card, chat, player list dibuat lebih compact.
-- Input dibuat ukuran aman agar HP tidak zoom otomatis.
-- Panel game, topbar, dan music player dibuat lebih minimalis.
-- Semua fitur lama tetap dipertahankan.
-
-
-## v3.7 Real Pages Clean Update
-- Menu HP/laptop dipisah menjadi halaman internal: Home, Akun, Buat Room, Lobby, Shop, Inventory, Crates, Friends, dan Leaderboard.
-- Tombol di menu utama sekarang berupa pilihan singkat agar tidak memanjang ke bawah.
-- Shop/Inventory/Crate/Leaderboard/Friends dibuka sebagai halaman penuh, bukan popup di atas halaman.
-- Semua gameplay dan fitur lama tetap dipertahankan.
+Jangan upload sebagai folder ganda. Railway akan redeploy otomatis.
