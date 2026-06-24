@@ -69,3 +69,15 @@ public/assets/tcg/asset-manifest.json
 ```
 
 Role card di UI sudah diganti dari emoji menjadi kartu visual TCG-style.
+
+
+## v3.6 Responsive Clean UI
+
+Update ini fokus ke tampilan agar lebih rapi di laptop dan HP tanpa mengubah fitur/gameplay:
+
+- Layout laptop lebih proporsional dan tidak terlalu penuh.
+- Layout HP satu kolom, tombol lebih nyaman disentuh.
+- Shop, inventory, leaderboard, profile, crate, music, role card, chat, player list dibuat lebih compact.
+- Input dibuat ukuran aman agar HP tidak zoom otomatis.
+- Panel game, topbar, dan music player dibuat lebih minimalis.
+- Semua fitur lama tetap dipertahankan.

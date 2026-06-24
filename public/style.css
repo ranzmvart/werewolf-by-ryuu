@@ -886,3 +886,278 @@ body {
 .cinematic-card .cinematic-main-asset { border-radius: 28px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); padding: 8px; }
 .tcg-asset-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
 @media (max-width: 680px) { .role-card-art-wrap { min-height: 200px; } .role-card-art { max-height: 230px; width: min(100%, 180px); } }
+
+/* =========================================================
+   v3.6 RESPONSIVE CLEAN UI PATCH
+   Fokus: ukuran lebih rapi, tombol konsisten, HP/laptop nyaman,
+   tanpa mengubah fitur/gameplay yang sudah ada.
+   ========================================================= */
+:root{
+  --ui-max: 1240px;
+  --ui-radius: 18px;
+  --ui-radius-sm: 13px;
+  --ui-gap: 12px;
+  --ui-pad: 14px;
+  --ui-btn-h: 42px;
+  --ui-shadow-soft: 0 14px 42px rgba(0,0,0,.30);
+}
+
+html{scroll-behavior:smooth;}
+body{overflow-x:hidden;}
+
+/* Global clean sizing */
+*{box-sizing:border-box;}
+button,.btn,input,select,textarea{font-family:inherit;}
+input,select,textarea{font-size:16px;} /* cegah zoom otomatis di iPhone/Android */
+.btn,button.btn{
+  min-height:var(--ui-btn-h);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  line-height:1;
+  white-space:nowrap;
+  touch-action:manipulation;
+}
+.btn.small,button.small{min-height:36px;padding:9px 12px;font-size:12px;}
+.btn:active{transform:translateY(1px) scale(.99);}
+input,select,textarea{min-height:42px;}
+
+/* Clean cards */
+.glass,.glass-lite,.panel,.narrative,.action-panel,.chat,.account-page-shell,.music-player{
+  box-shadow:var(--ui-shadow-soft);
+}
+.panel,.narrative,.action-panel,.chat,.topbar,.room-browser,.account-hub{
+  border-radius:var(--ui-radius);
+}
+
+/* Login / menu lebih lega di laptop dan tidak menumpuk di HP */
+.login-screen{padding:clamp(12px,2.2vw,28px);}
+.hero-card{
+  width:min(1120px,100%);
+  margin-inline:auto;
+  padding:clamp(18px,3vw,34px);
+}
+.hero-card h1{font-size:clamp(34px,6vw,68px);line-height:.95;margin-bottom:10px;}
+.subtitle{max-width:760px;margin-inline:auto;font-size:clamp(13px,1.7vw,16px);}
+.form-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  align-items:end;
+}
+.form-grid .btn{width:100%;}
+.account-hub{max-width:100%;}
+.auth-grid{
+  grid-template-columns:1.1fr .8fr 1fr auto auto;
+  align-items:end;
+}
+.hub-tabs{
+  gap:7px;
+  padding:3px 0 5px;
+  scrollbar-width:thin;
+}
+.hub-tab{
+  min-height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+.room-list{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));max-height:320px;}
+.room-card{min-width:0;}
+
+/* Game layout desktop */
+.game-screen{padding:14px 14px 108px;}
+.topbar{
+  width:min(var(--ui-max),100%);
+  margin:0 auto 12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:14px;
+}
+.topbar h2{font-size:clamp(20px,2.4vw,28px);margin:4px 0 0;}
+.room-code{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.timer-wrap{text-align:right;min-width:170px;}
+.timer{font-size:clamp(22px,3vw,32px);}
+.layout{
+  width:min(var(--ui-max),100%);
+  margin-inline:auto;
+  grid-template-columns:280px minmax(0,1fr) 290px;
+  gap:var(--ui-gap);
+  align-items:start;
+}
+.left-panel,.right-panel{position:sticky;top:12px;max-height:calc(100vh - 132px);overflow:auto;}
+.center-stage{gap:var(--ui-gap);}
+.panel,.narrative,.action-panel,.chat{padding:var(--ui-pad);}
+.action-panel{min-height:190px;}
+.role-card{min-height:unset;}
+.role-card-art-wrap{min-height:210px;}
+.role-card-art{max-height:242px;}
+.private-info{font-size:12px;padding:10px;border-radius:14px;}
+.players{max-height:360px;}
+.game-logs{max-height:165px;}
+.chat-log{height:260px;max-height:34vh;min-height:180px;}
+.target-grid{grid-template-columns:repeat(auto-fit,minmax(138px,1fr));}
+.target{min-height:82px;}
+
+/* Halaman akun/shop/inventory/leaderboard dibuat terasa seperti page, bukan popup sempit */
+.account-page{
+  align-items:stretch;
+  padding:clamp(10px,2vw,22px);
+}
+.account-page-shell{
+  width:min(1180px,100%);
+  height:min(88vh,860px);
+  margin:auto;
+  border-radius:24px;
+}
+.account-page-head{padding:16px 18px;}
+.account-page-content{padding:16px;}
+.shop-grid{grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+.shop-item{min-width:0;}
+.shop-actions{flex-wrap:wrap;}
+.leader-row{grid-template-columns:42px minmax(0,1fr) auto;}
+.leader-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stat-card-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+
+/* Crate / cinematic lebih proporsional */
+.crate-opening-shell{width:min(880px,calc(100vw - 24px));}
+.case-item{flex-basis:106px;}
+.cinematic-card{width:min(560px,calc(100vw - 24px));padding:clamp(22px,4vw,38px);border-radius:26px;}
+.cinematic-icon{font-size:clamp(54px,9vw,86px);}
+.cinematic h2{font-size:clamp(26px,5vw,48px);}
+.cinematic p{font-size:clamp(14px,2vw,17px);}
+
+/* Music player tidak menutup tombol game */
+.music-player{
+  width:min(720px,calc(100vw - 20px));
+  border-radius:18px;
+}
+.music-player.minimized{width:min(390px,calc(100vw - 20px));}
+.music-search-row,.music-controls{gap:8px;}
+.music-results{max-height:min(38vh,310px);}
+
+/* Tablet: tetap rapi, panel kanan turun */
+@media (max-width: 1180px){
+  :root{--ui-max: 980px;}
+  .layout{grid-template-columns:260px minmax(0,1fr);}
+  .right-panel{grid-column:1/-1;position:relative;top:auto;max-height:none;}
+  .right-panel .players{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));max-height:260px;}
+  .right-panel .log-box{margin-top:12px;}
+}
+
+/* HP besar / tablet kecil */
+@media (max-width: 820px){
+  :root{--ui-gap:10px;--ui-pad:12px;--ui-btn-h:40px;}
+  .login-screen{padding:10px;}
+  .hero-card{border-radius:22px;padding:18px;}
+  .brand-mark{transform:scale(.86);}
+  .form-grid{grid-template-columns:1fr 1fr;}
+  .auth-grid{grid-template-columns:1fr 1fr;}
+  .auth-grid .avatar-pick{grid-column:1/-1;}
+  .auth-grid .btn{width:100%;}
+  .account-head{display:grid;gap:8px;}
+  .profile-summary{grid-template-columns:auto minmax(0,1fr);}
+  .room-list{grid-template-columns:1fr;max-height:300px;}
+
+  .game-screen{padding:8px 8px 98px;}
+  .topbar{
+    grid-template-columns:1fr auto;
+    gap:10px;
+    position:sticky;
+    top:6px;
+    z-index:24;
+    backdrop-filter:blur(18px);
+  }
+  .timer-wrap{grid-column:1/-1;text-align:left;min-width:0;display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;}
+  .phase-line,.reconnect-status{font-size:11px;}
+  .menu-btn{justify-self:end;}
+  .layout{grid-template-columns:1fr;gap:10px;}
+  .left-panel,.right-panel{position:relative;top:auto;max-height:none;}
+  .center-stage{order:1;}
+  .left-panel{order:2;}
+  .right-panel{order:3;}
+  .narrative{order:0;}
+  .action-panel{order:1;min-height:unset;}
+  .chat{order:2;}
+  .role-card-art-wrap{min-height:180px;}
+  .role-card-art{max-height:210px;}
+  .host-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+  .host-tools h4,.timer-settings{grid-column:1/-1;}
+  .voice-actions{display:grid;grid-template-columns:repeat(3,1fr);}
+  .voice-actions .btn{width:100%;}
+  .players{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:280px;}
+  .player{grid-template-columns:36px minmax(0,1fr) auto;padding:9px;border-radius:14px;}
+  .p-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .target-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .chat-log{height:260px;max-height:40vh;}
+
+  .account-page{padding:0;background:rgba(0,0,0,.82);}
+  .account-page-shell{height:100dvh;width:100%;border-radius:0;border-left:0;border-right:0;}
+  .account-page-head{padding:14px 14px;position:sticky;top:0;z-index:2;backdrop-filter:blur(16px);}
+  .account-page-head b{font-size:22px;}
+  .account-page-head span{font-size:12px;}
+  .account-page-content{padding:12px;overflow:auto;}
+  .shop-grid{grid-template-columns:1fr;}
+  .profile-hero-card{grid-template-columns:auto 1fr;text-align:left;}
+  .profile-avatar.big{width:70px;height:70px;border-radius:22px;}
+}
+
+/* HP kecil: desain satu tangan, tombol full width jika perlu */
+@media (max-width: 560px){
+  body{font-size:14px;}
+  .hero-card h1{font-size:38px;}
+  .subtitle{font-size:13px;}
+  .form-grid,.auth-grid{grid-template-columns:1fr;}
+  .room-browser-head{display:grid;}
+  .room-browser-head .btn{width:100%;}
+  .resume-box{grid-template-columns:1fr;gap:10px;}
+  .resume-actions{display:grid;grid-template-columns:1fr 1fr;}
+  .hub-tabs{margin-inline:-2px;}
+  .hub-tab{min-width:auto;padding:9px 11px;font-size:12px;}
+  .topbar{border-radius:16px;padding:11px;}
+  .topbar h2{font-size:20px;}
+  .timer{font-size:24px;}
+  .code-pill{max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+  .panel,.narrative,.action-panel,.chat{border-radius:16px;padding:11px;}
+  .narrative b{font-size:15px;}
+  .narrative span,#actionHint{font-size:12px;}
+  .target-grid{grid-template-columns:1fr 1fr;gap:7px;}
+  .target{min-height:76px;padding:10px;border-radius:13px;}
+  .target .name{font-size:13px;}
+  .target .meta{font-size:11px;}
+  .players{grid-template-columns:1fr;max-height:240px;}
+  .game-logs{max-height:120px;}
+  .chat-head{align-items:flex-start;}
+  .chat-head select{max-width:135px;min-height:38px;}
+  .chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;}
+  .chat-form .btn{padding-inline:12px;}
+  .host-tools{grid-template-columns:1fr;}
+  .timer-settings{grid-template-columns:1fr 1fr;}
+  .timer-settings button{grid-column:1/-1;}
+  .voice-actions{grid-template-columns:1fr;}
+  .music-player{bottom:8px;width:calc(100vw - 14px);border-radius:16px;}
+  .music-player.minimized{width:calc(100vw - 14px);}
+  .music-search-row{display:grid;grid-template-columns:1fr auto;}
+  .music-search-row .btn{padding-inline:10px;}
+  .music-controls{display:grid;grid-template-columns:repeat(3,1fr);}
+  .music-controls .btn{width:100%;}
+  .toast-stack{right:8px;bottom:84px;width:calc(100vw - 16px);}
+  .crate-opening-shell{border-radius:20px;padding:14px;}
+  .case-spinner{height:120px;}
+  .case-item{flex-basis:88px;height:96px;}
+  .case-item img{width:44px;height:44px;}
+  .case-item b{font-size:10px;}
+  .cinematic-card{border-radius:22px;}
+}
+
+/* Mode sangat kecil */
+@media (max-width: 380px){
+  .target-grid{grid-template-columns:1fr;}
+  .timer-settings{grid-template-columns:1fr;}
+  .chat-form{grid-template-columns:1fr;}
+  .chat-form .btn{width:100%;}
+  .profile-summary{grid-template-columns:1fr;text-align:center;}
+  .profile-avatar{margin:auto;}
+}
