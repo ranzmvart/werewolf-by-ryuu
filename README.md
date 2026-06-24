@@ -1,25 +1,13 @@
-# Werewolf by Ryuu v4.1 - Reconnect/Kades/Assets Fix
+# Werewolf by Ryuu v4.2 — Hard Reconnect + Kades Fix
 
-Patch ini memperbaiki:
+Patch fokus:
+- Fix crash/loop setelah Vote Kepala Desa.
+- Menambahkan handler fase malam yang aman agar server tidak restart saat Kades selesai.
+- Auto reconnect tidak lagi spam setelah pemain sudah berhasil kembali.
+- Status reconnect kembali Online saat room state diterima.
+- Vote Kades satu pemain hanya bisa satu kali per ronde.
+- Jika semua pemain sudah vote Kades, fase lanjut ke malam secara paksa/aman.
+- Reconnect player/host dibuat idempotent agar tidak log spam dan tidak mengulang state.
+- Semua fitur lama tetap dipertahankan.
 
-- Bug room baru tiba-tiba masuk fase Kepala Desa sebelum host klik Start.
-- Auto reconnect yang terlalu agresif dan menyebabkan loop reconnect.
-- Pemulihan auth/socket setelah reconnect tanpa memaksa reconnect saat baru join room.
-- Room list hanya menampilkan room lobby yang benar-benar belum mulai.
-- Guard server: fase Kades/role reveal tidak bisa berjalan kalau game belum dimulai.
-- Path asset TCG yang salah diperbaiki agar tidak muncul teks scene/image atau gambar kosong.
-- Layout game room dari v3.9 tetap dipertahankan.
-
-Upload isi folder ini ke root repo GitHub, lalu Railway redeploy.
-
-Struktur:
-
-```
-public/
-server.js
-package.json
-railway.json
-Dockerfile
-README.md
-ASSET_CREDITS.md
-```
+Upload isi folder ini ke root GitHub repo, bukan folder ZIP-nya.

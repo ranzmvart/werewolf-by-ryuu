@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "4.1.0",
-  "description": "Werewolf by Ryuu v4.1 reconnect kades and asset fix",
+  "version": "4.2.0",
+  "description": "Werewolf by Ryuu v4.2 Hard Reconnect Kades Fix",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

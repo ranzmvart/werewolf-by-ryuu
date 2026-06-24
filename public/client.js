@@ -302,12 +302,14 @@ function reconnectFromSavedSession(showError = true, reason = 'manual') {
   if (!showError && reason !== 'socket-reconnect' && reason !== 'auto-login-after-disconnect') return;
   if (!showError && currentRoomCode && session.code !== currentRoomCode) return;
   if (!showError && !hadSocketDisconnect && !allowAutoReconnectOnce) return;
+  if (!showError && socket.id && lastRecoveredSocketId === socket.id) return;
   if (reconnectInFlight) return;
   if (!showError && now - lastAutoReconnectAt < 4500) return;
   if (now - lastReconnectAttemptAt < 900) return;
   lastReconnectAttemptAt = now;
   if (!showError) lastAutoReconnectAt = now;
   reconnectInFlight = true;
+  if (!showError && socket.id) lastRecoveredSocketId = socket.id;
   setConnectionStatus('reconnecting', 'Reconnecting...');
   if (showError) setUiLoading(true, 'Menghubungkan ulang ke room...');
   const name = accountProfile?.username || els.nameInput.value.trim() || localStorage.getItem('werewolfName') || 'Player';
@@ -323,6 +325,7 @@ function reconnectFromSavedSession(showError = true, reason = 'manual') {
     currentRoomCode = res.code;
     hadSocketDisconnect = false;
     allowAutoReconnectOnce = false;
+    setConnectionStatus('online', 'Online');
     enterGame();
     if (showError) toast('Reconnect berhasil', `Kamu kembali ke room ${res.code}.`);
     softHideLoader(showError ? 550 : 120);
@@ -480,17 +483,13 @@ els.chatForm.onsubmit = (e) => {
 
 socket.on('connect', () => {
   setConnectionStatus('online', 'Online');
-  autoLoginAccount(true);
+  const shouldRecoverRoom = hadSocketDisconnect && !els.game.classList.contains('hidden') && !!getSession()?.code;
+  autoLoginAccount(true, shouldRecoverRoom);
   requestRoomList(false);
-  // Auto reconnect hanya setelah socket benar-benar disconnect, bukan saat baru join room.
-  if (hadSocketDisconnect && !els.game.classList.contains('hidden') && getSession()?.code) {
-    allowAutoReconnectOnce = true;
-    setTimeout(() => reconnectFromSavedSession(false, 'socket-reconnect'), accountProfile ? 450 : 1000);
-  }
 });
 
 socket.io.on('reconnect_attempt', () => setConnectionStatus('reconnecting', 'Reconnecting...'));
-socket.on('disconnect', () => { hadSocketDisconnect = true; setConnectionStatus('offline', 'Offline'); });
+socket.on('disconnect', () => { hadSocketDisconnect = true; reconnectInFlight = false; setConnectionStatus('offline', 'Offline'); });
 socket.on('connect_error', () => setConnectionStatus('offline', 'Koneksi gagal'));
 
 socket.on('rooms:list', (rooms) => {
@@ -532,6 +531,7 @@ socket.on('reward:summary', ({ points, won, profile } = {}) => {
 });
 
 socket.on('room:state', (state) => {
+  if (socket.connected) setConnectionStatus('online', 'Online');
   const prevPhase = roomState?.phase;
   roomState = state;
   if (state?.code) currentRoomCode = state.code;
@@ -870,7 +870,7 @@ function authPayload() {
   return { username, pin };
 }
 
-function autoLoginAccount(force = false) {
+function autoLoginAccount(force = false, recoverRoomAfterLogin = false) {
   const saved = savedAuth();
   if (!saved?.username || !saved?.pin) { renderAccountHub(); return; }
   // Force re-auth after Socket.IO reconnect because the server auth session is tied to socket.id.
@@ -884,7 +884,7 @@ function autoLoginAccount(force = false) {
       latestLeaderboards = res.leaderboards || latestLeaderboards;
       els.nameInput.value = accountProfile.username;
       renderAccountHub();
-      if (hadSocketDisconnect && !els.game.classList.contains('hidden') && getSession()?.code) {
+      if (recoverRoomAfterLogin && !els.game.classList.contains('hidden') && getSession()?.code) {
         allowAutoReconnectOnce = true;
         setTimeout(() => reconnectFromSavedSession(false, 'auto-login-after-disconnect'), 350);
       }

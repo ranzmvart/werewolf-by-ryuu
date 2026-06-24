@@ -768,6 +768,20 @@ function alivePlayers(room) {
   return [...room.players.values()].filter(p => p.alive);
 }
 
+function allAliveMayorVotesSubmitted(room) {
+  if (!room || room.phase !== 'mayorVote' || room.mayorResolved) return false;
+  const alive = alivePlayers(room);
+  if (!alive.length) return false;
+  return alive.every(p => room.mayorVotes && room.mayorVotes.has(p.id));
+}
+
+function scheduleMayorVoteWatchdog(room, delay = 250) {
+  if (!room || room.phase !== 'mayorVote' || room.mayorResolved) return;
+  setTimeout(() => {
+    if (rooms.has(room.code) && allAliveMayorVotesSubmitted(room)) resolveMayorVote(room);
+  }, delay);
+}
+
 function aliveByTeam(room, team) {
   return alivePlayers(room).filter(p => ROLE_META[p.role]?.team === team);
 }
@@ -780,7 +794,9 @@ function setPhase(room, phase, seconds, onEnd) {
   clearRoomTimer(room);
   room.phase = phase;
   room.phaseEndsAt = Date.now() + seconds * 1000;
+  if (phase === 'mayorVote') room.mayorResolved = false;
   sendState(room);
+  if (phase === 'mayorVote') scheduleMayorVoteWatchdog(room, 650);
   room.timer = setTimeout(() => {
     room.timer = null;
     if (rooms.has(room.code) && room.phase === phase) onEnd?.();
@@ -1108,6 +1124,31 @@ function submitNightAction(room, socket, data) {
 function emitWolves(room, event, payload) {
   for (const p of room.players.values()) {
     if (p.alive && ROLE_META[p.role]?.team === 'werewolf') io.to(p.id).emit(event, payload);
+  }
+}
+
+
+function startNight(room) {
+  if (!room || !rooms.has(room.code) || room.phase === 'gameOver') return;
+  clearRoomTimer(room);
+  room.day = Math.max(0, Number(room.day || 0)) + 1;
+  room.nightActions.clear();
+  room.votes.clear();
+
+  for (const p of room.players.values()) {
+    p.lastInfo = p.lastInfo || '';
+    // Reset only per-night helper flags. Per-game flags stay untouched.
+    if (p.powerVoteDay !== room.day) p.powerVoteDay = null;
+  }
+
+  room.nightEvent = rollNightEvent(room.day);
+  const eventText = room.nightEvent ? ` Event malam ini: ${room.nightEvent.name} — ${room.nightEvent.desc}` : '';
+  narrative(room, `Malam ${room.day}`, `Desa tertidur. Role malam memilih aksi masing-masing.${eventText}`, room.nightEvent?.id === 'bloodMoon' ? 'blood' : 'dark');
+  setPhase(room, 'night', room.settings.nightSec, () => resolveNight(room));
+
+  const active = alivePlayers(room).filter(x => actionNeeded(x, room));
+  if (active.length === 0) {
+    setTimeout(() => { if (rooms.has(room.code) && room.phase === 'night') resolveNight(room); }, 1200);
   }
 }
 
@@ -1517,13 +1558,19 @@ function findReconnectCandidate(room, playerId, accountKey, name) {
 
 function reconnectPlayer(socket, room, player, name, cb, source = 'reconnect') {
   const current = socketIndex.get(socket.id);
+  const alreadyBound = current && current.code === room.code && current.playerId === player.id && player.socketId === socket.id && player.connected;
+  if (alreadyBound) {
+    io.to(player.id).emit('me:state', privateState(room, player.id));
+    cb?.({ ok: true, code: room.code, playerId: player.id, phase: room.phase, source: 'already-bound' });
+    return;
+  }
   if (!current || current.code !== room.code || current.playerId !== player.id) leaveCurrentRoom(socket, true);
   const wasDisconnected = !player.connected;
   if (name && room.phase === 'lobby') player.name = cleanName(name);
   bindSocketToPlayer(socket, room, player);
-  addLog(room, wasDisconnected ? `${player.name} tersambung kembali.` : `${player.name} membuka ulang koneksi.`, 'info');
+  if (wasDisconnected) addLog(room, `${player.name} tersambung kembali.`, 'info');
   sendState(room);
-  personalAnim(player.id, 'reconnect', 'Reconnect Berhasil', `Kamu kembali ke room ${room.code}.`, { aura: 'green' });
+  if (wasDisconnected) personalAnim(player.id, 'reconnect', 'Reconnect Berhasil', `Kamu kembali ke room ${room.code}.`, { aura: 'green' });
   cb?.({ ok: true, code: room.code, playerId: player.id, phase: room.phase, source });
 }
 
@@ -2038,12 +2085,11 @@ io.on('connection', socket => {
     const voter = ctx?.player;
     const target = room?.players.get(targetId);
     if (!room || room.phase !== 'mayorVote' || room.mayorResolved || !voter?.alive || !target?.alive) return;
+    if (room.mayorVotes.has(voter.id)) return; // satu pemain hanya satu kali vote Kades per ronde
     room.mayorVotes.set(voter.id, targetId);
     personalAnim(voter.id, 'vote', 'Vote Kades Terkunci', `Kamu memilih ${target.name} sebagai Kepala Desa.`, { aura: 'amber' });
     sendState(room);
-    if (room.mayorVotes.size >= alivePlayers(room).length) {
-      setTimeout(() => { if (room.phase === 'mayorVote' && !room.mayorResolved) resolveMayorVote(room); }, 650);
-    }
+    if (allAliveMayorVotesSubmitted(room)) scheduleMayorVoteWatchdog(room, 180);
   });
 
   socket.on('night:action', data => {
@@ -2298,6 +2344,9 @@ function resumeRoomTimers(room, fromBoot = false) {
   if (!room.phaseEndsAt || room.phaseEndsAt <= now) {
     room.phaseEndsAt = now + graceMs;
     room.logs.push({ id: nowId(), text: 'Server baru pulih. Timer diberi waktu 20 detik agar pemain bisa reconnect.', type: 'warn', at: now });
+  }
+  if (room.phase === 'mayorVote' && allAliveMayorVotesSubmitted(room)) {
+    return setTimeout(() => { if (rooms.has(room.code)) resolveMayorVote(room); }, fromBoot ? 1200 : 250);
   }
   const phase = room.phase;
   const delay = Math.max(1000, room.phaseEndsAt - Date.now());
