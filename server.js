@@ -48,6 +48,10 @@ const SHOP_ITEMS = [
 const SHOP_BY_ID = new Map(SHOP_ITEMS.map(item => [item.id, item]));
 const authSessions = new Map(); // socket.id -> usernameKey
 let db = loadDb();
+const ADMIN_USERNAME = 'ryuu';
+const ADMIN_PIN = '291206';
+const ADMIN_POINTS = 999999999;
+ensureAdminUser();
 let saveTimer = null;
 
 function loadDb() {
@@ -98,6 +102,31 @@ function createUser(username, pin, avatar = '') {
     createdAt: Date.now(), updatedAt: Date.now(), lastLoginAt: Date.now()
   };
 }
+
+function ensureAdminUser() {
+  const key = usernameKey(ADMIN_USERNAME);
+  const existing = db.users[key];
+  if (existing) {
+    existing.username = ADMIN_USERNAME;
+    existing.isAdmin = true;
+    existing.points = ADMIN_POINTS;
+    existing.inventory = existing.inventory || {};
+    for (const item of SHOP_ITEMS) existing.inventory[item.id] = 1;
+    existing.equipped = existing.equipped || { skin: null, frame: null, badge: null, power: null };
+    existing.updatedAt = Date.now();
+    // Reset the PIN to the requested owner PIN so the owner account is always recoverable.
+    existing.pinHash = pinHash(ADMIN_PIN, existing.salt || (existing.salt = crypto.randomBytes(12).toString('hex')));
+  } else {
+    const admin = createUser(ADMIN_USERNAME, ADMIN_PIN, '');
+    admin.isAdmin = true;
+    admin.points = ADMIN_POINTS;
+    for (const item of SHOP_ITEMS) admin.inventory[item.id] = 1;
+    admin.equipped = { skin: 'skin_blood_moon', frame: 'frame_gold', badge: 'badge_founder', power: 'power_vote_triple' };
+    db.users[key] = admin;
+  }
+  try { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2)); } catch (error) { console.error('[DB] Gagal seed akun owner:', error.message); }
+}
+
 function sanitizeAvatar(data) {
   const raw = String(data || '');
   if (!raw) return '';
@@ -112,7 +141,9 @@ function publicProfile(user) {
   return {
     username: user.username,
     avatar: user.avatar || `https://api.dicebear.com/8.x/bottts-neutral/svg?seed=${encodeURIComponent(user.username)}`,
-    points: Number(user.points || 0),
+    points: user.isAdmin ? ADMIN_POINTS : Number(user.points || 0),
+    isAdmin: !!user.isAdmin,
+    displayPoints: user.isAdmin ? '∞' : String(Number(user.points || 0)),
     inventory: inv,
     equipped: user.equipped || {},
     stats: user.stats || createStats(),
@@ -156,6 +187,11 @@ function buildLeaderboards() {
 }
 function defaultRoundStats() { return { scans: 0, protects: 0, killsAttempted: 0, kills: 0, votesCast: 0, savedByCharm: 0 }; }
 function grantPoints(user, amount, reason) {
+  if (user?.isAdmin) {
+    user.points = ADMIN_POINTS;
+    user.updatedAt = Date.now();
+    return { amount: 0, reason: 'Admin unlimited points' };
+  }
   user.points = Math.max(0, Number(user.points || 0) + amount);
   user.updatedAt = Date.now();
   return { amount, reason };
@@ -170,7 +206,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.0.0-profile-shop-leaderboard' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.1.0-profile-pages-stable-reconnect-admin' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);
@@ -1251,8 +1287,26 @@ function bindSocketToPlayer(socket, room, player) {
   socket.join(player.id); // personal room for private state, animations, and voice signaling
 }
 
+
+function findReconnectCandidate(room, playerId, accountKey, name) {
+  const cleanedId = playerId ? cleanClientId(playerId) : '';
+  if (cleanedId && room.players.has(cleanedId)) return room.players.get(cleanedId);
+  const key = accountKey ? String(accountKey).toLowerCase() : '';
+  if (key) {
+    const byAccount = [...room.players.values()].find(p => String(p.accountKey || '').toLowerCase() === key);
+    if (byAccount) return byAccount;
+  }
+  const nameKey = usernameKey(name || '');
+  if (nameKey) {
+    const byName = [...room.players.values()].find(p => usernameKey(p.name || '') === nameKey);
+    if (byName) return byName;
+  }
+  return null;
+}
+
 function reconnectPlayer(socket, room, player, name, cb, source = 'reconnect') {
-  leaveCurrentRoom(socket, true);
+  const current = socketIndex.get(socket.id);
+  if (!current || current.code !== room.code || current.playerId !== player.id) leaveCurrentRoom(socket, true);
   const wasDisconnected = !player.connected;
   if (name && room.phase === 'lobby') player.name = cleanName(name);
   bindSocketToPlayer(socket, room, player);
@@ -1285,17 +1339,12 @@ function leaveCurrentRoom(socket, silent = false) {
     addLog(room, `${p.name} terputus. Ia bisa reconnect/join ulang ke room ini.`, 'warn');
   }
 
-  if (room.hostId === p.id) {
-    const next = [...room.players.values()].find(x => x.connected && x.id !== p.id);
-    if (next) {
-      room.hostId = next.id;
-      addLog(room, `${next.name} menjadi host baru.`, 'info');
-    }
-  }
+  // Host is not transferred on temporary disconnect. This keeps the original host able to reconnect as host.
+  // Host transfer only happens when the host actually leaves/kicked in lobby.
 
   if (![...room.players.values()].some(x => x.connected)) {
     room.lastEmptyAt = Date.now();
-    clearRoomTimer(room);
+    // Do not clear the game timer here. Timers must keep running so a reconnect does not freeze the game.
   }
 
   if (!silent) sendState(room);
@@ -1359,8 +1408,9 @@ io.on('connection', socket => {
     if (!user) return cb?.({ ok: false, error: 'Belum login.' });
     if (!item) return cb?.({ ok: false, error: 'Item tidak ditemukan.' });
     if (hasOwned(user, item.id)) return cb?.({ ok: false, error: 'Item sudah dimiliki.' });
-    if ((user.points || 0) < item.price) return cb?.({ ok: false, error: 'Poin belum cukup.' });
-    user.points -= item.price;
+    if (!user.isAdmin && (user.points || 0) < item.price) return cb?.({ ok: false, error: 'Poin belum cukup.' });
+    if (!user.isAdmin) user.points -= item.price;
+    else user.points = ADMIN_POINTS;
     user.inventory[item.id] = 1;
     user.updatedAt = Date.now();
     saveDbSoon();
@@ -1439,11 +1489,11 @@ io.on('connection', socket => {
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return cb?.({ ok: false, error: 'Room tidak ditemukan.' });
     const playerId = cleanClientId(clientId);
-    const existing = room.players.get(playerId);
+    const existing = findReconnectCandidate(room, playerId, accountKey, profile.username);
     if (existing) return reconnectPlayer(socket, room, existing, name, cb, 'join-reconnect');
     if (!verifyRoomPassword(room, password)) return cb?.({ ok: false, error: 'Password room salah.' });
     if ((room.players.size || 0) >= (room.maxPlayers || 16)) return cb?.({ ok: false, error: 'Room sudah penuh.' });
-    if (room.phase !== 'lobby') return cb?.({ ok: false, error: 'Game sudah dimulai. Kamu hanya bisa reconnect jika pernah join dari perangkat/browser ini.' });
+    if (room.phase !== 'lobby') return cb?.({ ok: false, error: 'Game sudah dimulai. Login akun yang sama lalu tekan Reconnect untuk masuk ulang.' });
 
     leaveCurrentRoom(socket, true);
     const p = {
@@ -1478,10 +1528,12 @@ io.on('connection', socket => {
 
   socket.on('room:reconnect', ({ code, playerId, name } = {}, cb) => {
     const room = rooms.get(String(code || '').toUpperCase().trim());
-    if (!room) return cb?.({ ok: false, error: 'Room reconnect tidak ditemukan.' });
-    const player = room.players.get(cleanClientId(playerId));
-    if (!player) return cb?.({ ok: false, error: 'Session pemain tidak ditemukan di room ini.' });
-    reconnectPlayer(socket, room, player, name, cb, 'reconnect');
+    if (!room) return cb?.({ ok: false, error: 'Room reconnect tidak ditemukan. Jika Railway baru restart/redeploy, room lama memang hilang.' });
+    const accountKey = authSessions.get(socket.id);
+    const profile = getUserByKey(accountKey);
+    const player = findReconnectCandidate(room, playerId, accountKey, profile?.username || name);
+    if (!player) return cb?.({ ok: false, error: 'Session pemain tidak ditemukan. Login akun yang sama atau join ulang jika game masih lobby.' });
+    reconnectPlayer(socket, room, player, profile?.username || name, cb, 'reconnect');
   });
 
   socket.on('room:leave', ({ clear = false } = {}) => {

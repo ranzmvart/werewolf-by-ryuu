@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "3.0.0",
-  "description": "Werewolf by Ryuu - Profile, PIN Login, Leaderboard Top 100, Points, Shop, Inventory, Skins, Power Items, Shared Music, Voice, Room List",
+  "version": "3.1.0",
+  "description": "Werewolf by Ryuu - Profile Pages, Stable Reconnect, Owner Account, Shop, Inventory, Leaderboard, Shared Music, Voice",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

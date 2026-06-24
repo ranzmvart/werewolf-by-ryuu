@@ -46,13 +46,27 @@ const els = {
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
   guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
-  accountHub: $('accountHub'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox')
+  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox')
 };
 
 const savedName = localStorage.getItem('werewolfName');
 if (savedName) els.nameInput.value = savedName;
 const savedRoomName = localStorage.getItem('werewolfRoomName');
 if (savedRoomName && els.roomNameInput) els.roomNameInput.value = savedRoomName;
+
+let loadingHideTimer = null;
+function setUiLoading(show = true, text = 'Memuat Ryuu Village...') {
+  if (!els.appLoader) return;
+  els.appLoader.querySelector('b').textContent = text;
+  els.appLoader.classList.toggle('hidden', !show);
+  clearTimeout(loadingHideTimer);
+}
+function softHideLoader(delay = 650) {
+  clearTimeout(loadingHideTimer);
+  loadingHideTimer = setTimeout(() => els.appLoader?.classList.add('hidden'), delay);
+}
+window.addEventListener('load', () => softHideLoader(450));
+setTimeout(() => softHideLoader(900), 900);
 
 const GUIDE_KEY = 'ryuuWerewolfGuideHiddenV1';
 function applyGuideVisibility() {
@@ -116,16 +130,19 @@ function reconnectFromSavedSession(showError = true) {
     return;
   }
   setConnectionStatus('reconnecting', 'Reconnecting...');
+  setUiLoading(true, 'Menghubungkan ulang ke room...');
   const name = els.nameInput.value.trim() || localStorage.getItem('werewolfName') || 'Player';
   socket.emit('room:reconnect', { code: session.code, playerId: session.playerId, name }, (res) => {
     if (!res?.ok) {
       setConnectionStatus(socket.connected ? 'online' : 'offline', socket.connected ? 'Online' : 'Offline');
       if (showError) toast('Reconnect gagal', res?.error || 'Session sudah tidak tersedia.');
+      softHideLoader(250);
       return;
     }
     saveSession(res.code, res.playerId);
     enterGame();
     toast('Reconnect berhasil', `Kamu kembali ke room ${res.code}.`);
+    softHideLoader(550);
   });
 }
 
@@ -144,8 +161,9 @@ els.createBtn.onclick = () => {
   const password = els.roomPasswordInput?.value?.trim() || '';
   localStorage.setItem('werewolfName', name);
   localStorage.setItem('werewolfRoomName', roomName);
+  setUiLoading(true, 'Membuat room...');
   socket.emit('room:create', { name, roomName, password, clientId }, (res) => {
-    if (!res?.ok) return toast('Gagal buat room', res?.error || 'Coba lagi.');
+    if (!res?.ok) { softHideLoader(250); return toast('Gagal buat room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -159,8 +177,9 @@ els.joinBtn.onclick = () => {
   if (!name || !code) return toast('Data belum lengkap', 'Isi nama dan kode room.');
   localStorage.setItem('werewolfName', name);
   const password = els.roomPasswordInput?.value?.trim() || '';
+  setUiLoading(true, 'Masuk ke room...');
   socket.emit('room:join', { name, code, password, clientId }, (res) => {
-    if (!res?.ok) return toast('Gagal join room', res?.error || 'Coba lagi.');
+    if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -214,8 +233,9 @@ window.joinListedRoom = (code, hasPassword) => {
   localStorage.setItem('werewolfName', name);
   els.codeInput.value = code;
   if (els.roomPasswordInput && password) els.roomPasswordInput.value = password;
+  setUiLoading(true, 'Masuk ke room...');
   socket.emit('room:join', { name, code, password, clientId }, (res) => {
-    if (!res?.ok) return toast('Gagal join room', res?.error || 'Coba lagi.');
+    if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -224,9 +244,11 @@ window.joinListedRoom = (code, hasPassword) => {
 function enterGame() {
   els.login.classList.add('hidden');
   els.game.classList.remove('hidden');
+  softHideLoader(650);
 }
 
 function showMenuOnly() {
+  softHideLoader(100);
   els.game.classList.add('hidden');
   els.login.classList.remove('hidden');
   renderResumeBox();
@@ -276,7 +298,7 @@ socket.on('connect', () => {
   requestRoomList(false);
   // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
   if (!els.game.classList.contains('hidden') && getSession()?.code) {
-    reconnectFromSavedSession(false);
+    setTimeout(() => reconnectFromSavedSession(false), accountProfile ? 150 : 650);
   }
 });
 
@@ -576,7 +598,7 @@ function escapeHtml(s) {
 // Account, shop, inventory, leaderboard
 const AUTH_KEY = 'ryuuWerewolfAccountV3';
 let selectedAvatarData = '';
-let activeHubTab = 'shop';
+let activeHubTab = 'profile';
 let activeLbTab = 'points';
 
 function itemById(id) { return shopCatalog.find(x => x.id === id) || null; }
@@ -595,6 +617,9 @@ function autoLoginAccount() {
       shopCatalog = res.shop || shopCatalog;
       latestLeaderboards = res.leaderboards || latestLeaderboards;
       renderAccountHub();
+      if (!els.game.classList.contains('hidden') && getSession()?.code) {
+        setTimeout(() => reconnectFromSavedSession(false), 180);
+      }
     } else renderAccountHub();
   });
 }
@@ -644,7 +669,7 @@ els.loginBtn?.addEventListener('click', () => {
   });
 });
 
-for (const [btn, tab] of [[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => { activeHubTab = tab; renderAccountHub(); });
+for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => { activeHubTab = tab; renderAccountHub(); });
 
 function renderAccountHub() {
   if (!els.accountStatus) return;
@@ -661,11 +686,59 @@ function renderAccountHub() {
     els.nameInput.disabled = false;
     els.profileSummary?.classList.add('hidden');
   }
-  for (const [btn, tab] of [[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.classList.toggle('active', activeHubTab === tab);
+  for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.classList.toggle('active', activeHubTab === tab);
   els.shopPanel?.classList.toggle('hidden', activeHubTab !== 'shop');
   els.inventoryPanel?.classList.toggle('hidden', activeHubTab !== 'inv');
   els.leaderboardPanel?.classList.toggle('hidden', activeHubTab !== 'lb');
-  renderShop(); renderInventory(); renderLeaderboard(); renderGameProfileBox();
+  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderGameProfileBox();
+}
+
+
+function pointsText(p) { return p?.isAdmin ? '∞' : (p?.displayPoints || String(p?.points || 0)); }
+function winRate(s = {}) { return s.games ? Math.round(((s.wins || 0) / s.games) * 100) : 0; }
+function renderProfilePanel() {
+  if (!els.profilePanel) return;
+  const p = accountProfile;
+  if (!p) {
+    els.profilePanel.innerHTML = '<div class="mini-note">Login atau daftar dulu. Setelah login, kotak login otomatis hilang dan halaman ini berubah menjadi profil pemain.</div>';
+    return;
+  }
+  const s = p.stats || {};
+  const eq = p.equipped || {};
+  els.profilePanel.innerHTML = `
+    <div class="profile-page">
+      <div class="profile-hero-card">
+        <img class="profile-avatar big ${escapeHtml(frameClass(eq.frame))}" src="${escapeHtml(p.avatar)}" alt="avatar">
+        <div>
+          <div class="profile-name big">${escapeHtml(p.username)} ${p.isAdmin ? '<span class="owner-chip">OWNER</span>' : ''}</div>
+          <div class="profile-points">💎 ${escapeHtml(pointsText(p))} poin</div>
+          <div class="power-note">Equip: ${eq.skin ? itemName(eq.skin) : 'No skin'} • ${eq.frame ? itemName(eq.frame) : 'No frame'} • ${eq.badge ? itemName(eq.badge) : 'No badge'} • ${eq.power ? itemName(eq.power) : 'No power'}</div>
+          <label class="btn secondary small avatar-change">Ganti Foto<input id="profileAvatarInput" type="file" accept="image/*"></label>
+        </div>
+      </div>
+      <div class="stat-card-grid">
+        <div class="stat-card"><b>${s.games || 0}</b><span>Total Main</span></div>
+        <div class="stat-card"><b>${s.wins || 0}</b><span>Menang</span></div>
+        <div class="stat-card"><b>${winRate(s)}%</b><span>Win Rate</span></div>
+        <div class="stat-card"><b>${s.winStreak || 0}</b><span>Win Streak</span></div>
+        <div class="stat-card"><b>${s.teamWins?.werewolf || 0}</b><span>Wolf Win</span></div>
+        <div class="stat-card"><b>${s.teamWins?.village || 0}</b><span>Village Win</span></div>
+      </div>
+      <div class="mini-note">Shop, Inventory, dan Leaderboard sudah dipisah di tab sendiri agar layar HP/laptop lebih rapi.</div>
+    </div>`;
+  const input = document.getElementById('profileAvatarInput');
+  input?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 350000) return toast('Foto terlalu besar', 'Gunakan gambar kecil di bawah 350 KB.');
+    const avatar = await fileToDataUrl(file);
+    socket.emit('auth:avatar', { avatar }, (res) => {
+      if (!res?.ok) return toast('Upload gagal', res?.error || 'Coba gambar lain.');
+      accountProfile = res.profile;
+      renderAccountHub();
+      toast('Avatar disimpan', 'Foto profil berhasil diperbarui.');
+    });
+  });
 }
 
 function renderShop() {

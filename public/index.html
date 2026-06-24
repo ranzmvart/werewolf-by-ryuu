@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <div id="appLoader" class="app-loader"><div class="loader-card"><div class="loader-wolf">🐺</div><b>Memuat Ryuu Village...</b><span>Menyiapkan room, profil, voice, dan musik.</span><div class="loader-line"><i></i></div></div></div>
   <div id="app">
     <section id="login" class="screen login-screen">
       <div class="orb orb-a"></div>
@@ -21,7 +22,7 @@
             <div><b>👤 Akun Pemain</b><span>Daftar/login pakai nama unik + PIN. Nama yang sudah dipakai tidak bisa didaftar lagi.</span></div>
             <span id="accountStatus" class="badge">Belum login</span>
           </div>
-          <div class="auth-grid">
+          <div id="authGrid" class="auth-grid">
             <label>Username<input id="authName" maxlength="18" placeholder="Nama unik kamu" autocomplete="username" /></label>
             <label>PIN<input id="authPin" maxlength="8" type="password" inputmode="numeric" placeholder="4-8 angka" autocomplete="current-password" /></label>
             <label class="avatar-pick">Foto Profil<input id="avatarInput" type="file" accept="image/*" /></label>
@@ -30,11 +31,13 @@
           </div>
           <div id="profileSummary" class="profile-summary hidden"></div>
           <div class="hub-tabs">
-            <button id="shopTabBtn" class="hub-tab active" type="button">Shop</button>
+            <button id="profileTabBtn" class="hub-tab active" type="button">Profil</button>
+            <button id="shopTabBtn" class="hub-tab" type="button">Shop</button>
             <button id="invTabBtn" class="hub-tab" type="button">Inventory</button>
             <button id="lbTabBtn" class="hub-tab" type="button">Leaderboard</button>
           </div>
-          <div id="shopPanel" class="hub-panel"></div>
+          <div id="profilePanel" class="hub-panel"></div>
+          <div id="shopPanel" class="hub-panel hidden"></div>
           <div id="inventoryPanel" class="hub-panel hidden"></div>
           <div id="leaderboardPanel" class="hub-panel hidden"></div>
         </div>
