@@ -366,7 +366,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.3.0-crates-friends-persistent-rooms' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.4.0-cinematic-crates-modern-assets' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);

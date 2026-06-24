@@ -49,7 +49,8 @@ const els = {
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
   guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
-  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), cratePanel: $('cratePanel'), friendsPanel: $('friendsPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), crateTabBtn: $('crateTabBtn'), friendsTabBtn: $('friendsTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose')
+  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), cratePanel: $('cratePanel'), friendsPanel: $('friendsPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), crateTabBtn: $('crateTabBtn'), friendsTabBtn: $('friendsTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose'),
+  crateOpening: $('crateOpening'), crateSkipBtn: $('crateSkipBtn'), crateDoneBtn: $('crateDoneBtn'), crateOpeningTitle: $('crateOpeningTitle'), crateOpeningPrice: $('crateOpeningPrice'), crateOpeningAsset: $('crateOpeningAsset'), caseRail: $('caseRail'), crateResult: $('crateResult'), crateResultCard: $('crateResultCard'), crateResultAsset: $('crateResultAsset'), crateResultRarity: $('crateResultRarity'), crateResultName: $('crateResultName'), crateResultDesc: $('crateResultDesc')
 };
 
 const savedName = localStorage.getItem('werewolfName');
@@ -586,8 +587,10 @@ function isWolf(role) { return role === 'Werewolf' || role === 'Alpha Werewolf';
 
 function showCinematic(a) {
   const map = {
-    roleReveal:'🎭', mayor:'👑', nightRole:'🌙', attack:'🐺', death:'💀', saved:'✨', seer:'🔮', heal:'💉', guard:'🛡️', poison:'🧪', vote:'🗳️', execution:'⚖️', hunter:'🏹', hunterShot:'🏹', victory:'🏆', defeat:'🌑', wolfWin:'🐺', villageWin:'🌅', jesterWin:'🃏', blocked:'⛔', cursed:'🌘', prince:'👑', bless:'⛪', powerItem:'⚡'
+    roleReveal: '/assets/inventory-box.svg', mayor: '/assets/trophy.svg', nightRole: '/assets/crate-moon.svg', attack: '/assets/wolf-attack.svg', death: '/assets/rarity-mythic.svg', saved: '/assets/guard-shield.svg', seer: '/assets/seer-orb.svg', heal: '/assets/doctor-drone.svg', guard: '/assets/guard-shield.svg', poison: '/assets/witch-vial.svg', vote: '/assets/coin-stack.svg', execution: '/assets/rarity-legendary.svg', hunter: '/assets/hunter-bow.svg', hunterShot: '/assets/hunter-bow.svg', victory: '/assets/trophy.svg', defeat: '/assets/rarity-common.svg', wolfWin: '/assets/wolf-attack.svg', villageWin: '/assets/trophy.svg', jesterWin: '/assets/rarity-epic.svg', blocked: '/assets/guard-shield.svg', cursed: '/assets/wolf-attack.svg', prince: '/assets/trophy.svg', bless: '/assets/guard-shield.svg', powerItem: '/assets/rarity-legendary.svg', crate: '/assets/inventory-box.svg'
   };
+  const actorAsset = map[a.type] || '/assets/wolf-attack.svg';
+  const targetAsset = a.type === 'attack' ? '/assets/rarity-mythic.svg' : a.type === 'seer' ? '/assets/seer-orb.svg' : a.type === 'heal' ? '/assets/doctor-drone.svg' : a.type === 'death' ? '/assets/rarity-common.svg' : '/assets/rarity-legendary.svg';
   const card = els.cinematic?.querySelector('.cinematic-card');
   if (card) {
     card.className = `cinematic-card scene-${String(a.type || 'event').replace(/[^a-zA-Z0-9_-]/g,'')}`;
@@ -597,9 +600,9 @@ function showCinematic(a) {
       scene.className = 'cinematic-3d-scene';
       card.insertBefore(scene, card.firstChild);
     }
-    scene.innerHTML = `<span class="scene-moon"></span><span class="scene-shadow"></span><span class="scene-actor">${map[a.type] || '🐺'}</span><span class="scene-target">${a.type === 'attack' ? '🧑' : a.type === 'seer' ? '👁️' : a.type === 'heal' ? '💚' : a.type === 'death' ? '⚰️' : '✨'}</span><span class="scene-particles"></span>`;
+    scene.innerHTML = `<span class="scene-moon"></span><span class="scene-shadow"></span><span class="scene-actor asset-actor"><img src="${actorAsset}" alt="scene"></span><span class="scene-target asset-target"><img src="${targetAsset}" alt="target"></span><span class="scene-particles"></span>`;
   }
-  els.cinematicIcon.textContent = map[a.type] || '🐺';
+  els.cinematicIcon.innerHTML = `<img class="cinematic-main-asset" src="${actorAsset}" alt="event">`;
   els.cinematicTitle.textContent = a.title || 'Event';
   els.cinematicText.textContent = a.text || '';
   els.cinematicTitle.className = a.aura || '';
@@ -620,6 +623,36 @@ function toast(title, text) {
 }
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+const CRATE_ASSETS = { crate_moon: '/assets/crate-moon.svg', crate_blood: '/assets/crate-blood.svg', crate_royal: '/assets/crate-royal.svg' };
+const RARITY_ASSETS = { common: '/assets/rarity-common.svg', rare: '/assets/rarity-rare.svg', epic: '/assets/rarity-epic.svg', legendary: '/assets/rarity-legendary.svg', mythic: '/assets/rarity-mythic.svg' };
+const ITEM_ASSETS = {
+  skin: '/assets/wolf-attack.svg', frame: '/assets/guard-shield.svg', badge: '/assets/trophy.svg', power: '/assets/rarity-legendary.svg', points: '/assets/coin-stack.svg', item: '/assets/inventory-box.svg'
+};
+function crateAsset(crateId) { return CRATE_ASSETS[crateId] || '/assets/inventory-box.svg'; }
+function rarityAsset(rarity) { return RARITY_ASSETS[String(rarity || 'common').toLowerCase()] || RARITY_ASSETS.common; }
+function rewardAsset(reward = {}) {
+  const name = String(reward.name || '').toLowerCase();
+  if (reward.type === 'points' || name.includes('poin') || name.includes('jackpot')) return ITEM_ASSETS.points;
+  if (name.includes('wolf') || name.includes('fang') || name.includes('abyss')) return '/assets/wolf-attack.svg';
+  if (name.includes('seer') || name.includes('vision') || name.includes('lens')) return '/assets/seer-orb.svg';
+  if (name.includes('doctor') || name.includes('kit')) return '/assets/doctor-drone.svg';
+  if (name.includes('guard') || name.includes('shield') || name.includes('charm')) return '/assets/guard-shield.svg';
+  if (name.includes('witch') || name.includes('vial')) return '/assets/witch-vial.svg';
+  if (name.includes('hunter')) return '/assets/hunter-bow.svg';
+  if (name.includes('badge') || name.includes('legend')) return '/assets/trophy.svg';
+  return rarityAsset(reward.rarity);
+}
+function rewardLabel(reward = {}) {
+  return `${reward.rarityLabel || 'Reward'}: ${reward.name || 'Hadiah'}${reward.qty ? ' x' + reward.qty : ''}`;
+}
+function pushInventoryToast(reward = {}) {
+  const div = document.createElement('div');
+  div.className = `toast loot-toast rarity-${escapeHtml(reward.rarity || 'common')}`;
+  div.innerHTML = `<img src="${rewardAsset(reward)}" alt="reward"><div><b>Masuk Inventory</b><span>${escapeHtml(rewardLabel(reward))}</span></div>`;
+  els.toastStack.appendChild(div);
+  setTimeout(() => div.remove(), 6200);
 }
 
 
@@ -830,7 +863,7 @@ function renderShop() {
     const status = isPower ? `<span class="owned">Stok x${count}</span>` : (owned ? '<span class="owned">Dimiliki</span>' : '');
     const equipBtn = owned ? (equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`) : '';
     const buyBtn = (isPower || !owned) ? `<button class="btn primary small" ${points < item.price ? 'disabled' : ''} onclick="buyItem('${item.id}')">${buyText}</button>` : '';
-    return `<div class="shop-item ${item.type}"><div class="shop-top"><div><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div><span class="badge">${isPower ? 'sekali pakai' : item.type}</span></div><div class="shop-actions"><span class="price">${item.price} poin</span><div class="item-stack">${status}${equipBtn}${buyBtn}</div></div></div>`;
+    return `<div class="shop-item ${item.type} game-asset-item rarity-${item.rarity || 'common'}"><div class="shop-top"><img class="item-asset" src="${rewardAsset(item)}" alt="item"><div><div class="shop-name">${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div><span class="badge">${isPower ? 'sekali pakai' : item.type}</span></div><div class="shop-actions"><span class="price">${item.price} poin</span><div class="item-stack">${status}${equipBtn}${buyBtn}</div></div></div>`;
   }).join('')}</div><div class="mini-note">Power item bersifat konsumsi: beli 1 = stok 1. Saat efeknya dipakai di game, stok berkurang 1. Dalam satu game satu power hanya bisa aktif satu kali.</div>`;
 }
 function renderInventory() {
@@ -842,7 +875,7 @@ function renderInventory() {
   els.inventoryPanel.innerHTML = `<div class="shop-grid">${owned.map(item => {
     const count = Number(inv[item.id] || 0);
     const equipped = accountProfile?.equipped?.[item.type] === item.id;
-    return `<div class="shop-item ${item.type}"><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div><div class="shop-actions"><span class="owned">${item.type === 'power' ? `Stok x${count}` : 'Dimiliki'}</span>${equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`}</div></div>`;
+    return `<div class="shop-item ${item.type} game-asset-item rarity-${item.rarity || 'common'}"><div class="shop-top"><img class="item-asset" src="${rewardAsset(item)}" alt="item"><div><div class="shop-name">${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div></div><div class="shop-actions"><span class="owned">${item.type === 'power' ? `Stok x${count}` : 'Dimiliki'}</span>${equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`}</div></div>`;
   }).join('')}</div><div class="mini-note">Equip power menentukan item yang siap dipakai. Stok power akan berkurang setelah efeknya benar-benar aktif di game.</div>`;
 }
 
@@ -854,7 +887,7 @@ function renderLeaderboard() {
   els.leaderboardPanel.innerHTML = `<div class="leader-tabs">${tabs.map(([id,label]) => `<button onclick="setLbTab('${id}')" class="${activeLbTab===id?'active':''}">${label}</button>`).join('')}</div>${list.slice(0,100).map((u,i) => `<div class="leader-row"><div class="rank">#${i+1}</div><div><div class="leader-name">${escapeHtml(u.username)}</div><div class="leader-meta">Win ${u.stats?.wins || 0} • Main ${u.stats?.games || 0} • Wolf ${u.stats?.teamWins?.werewolf || 0} • Village ${u.stats?.teamWins?.village || 0}</div></div><b>${u.points || 0}</b></div>`).join('')}`;
 }
 window.setLbTab = (id) => { activeLbTab = id; renderLeaderboard(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); };
-window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dibeli', `${res.item?.name || itemId} masuk inventory.`); });
+window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); pushInventoryToast(res.item || { name: itemId, rarity: 'rare' }); });
 window.equipItem = (itemId) => socket.emit('shop:equip', { itemId }, (res) => { if (!res?.ok) return toast('Gagal equip', res?.error || 'Belum dimiliki.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dipakai', `${res.item?.name || itemId} sekarang aktif.`); });
 
 
@@ -863,22 +896,98 @@ function renderCrates() {
   if (!accountProfile) { els.cratePanel.innerHTML = '<div class="mini-note">Login dulu untuk membuka crate.</div>'; return; }
   if (!crateCatalog.length) { els.cratePanel.innerHTML = '<div class="mini-note">Crate belum dimuat.</div>'; return; }
   const points = accountProfile?.isAdmin ? Infinity : Number(accountProfile?.points || 0);
-  els.cratePanel.innerHTML = `<div class="crate-grid">${crateCatalog.map(c => {
+  els.cratePanel.innerHTML = `<div class="crate-grid cinematic-crate-grid">${crateCatalog.map(c => {
     const weights = c.weights || {};
-    return `<div class="crate-card"><div class="crate-box">${escapeHtml(c.emoji || '🎁')}</div><div class="crate-title">${escapeHtml(c.name)}</div><div class="shop-desc">${escapeHtml(c.desc || '')}</div><div class="crate-odds"><span>Rare ${weights.rare || 0}%</span><span>Epic ${weights.epic || 0}%</span><span>Legendary ${weights.legendary || 0}%</span><span>Mythic ${weights.mythic || 0}%</span></div><div class="shop-actions"><span class="price">${c.price} poin</span><button class="btn primary small" ${points < c.price ? 'disabled' : ''} onclick="openCrate('${c.id}')">Open</button></div></div>`;
-  }).join('')}</div><div class="mini-note">Gacha memakai poin game. Hadiah bisa poin, skin, frame, badge, atau power item sekali pakai.</div>`;
+    return `<div class="crate-card crate-card-modern rarity-${c.id === 'crate_royal' ? 'legendary' : c.id === 'crate_blood' ? 'epic' : 'rare'}">
+      <div class="crate-box crate-box-asset"><img src="${crateAsset(c.id)}" alt="${escapeHtml(c.name)}"><span class="crate-glow"></span></div>
+      <div class="crate-title">${escapeHtml(c.name)}</div>
+      <div class="shop-desc">${escapeHtml(c.desc || '')}</div>
+      <div class="crate-odds modern-odds"><span>Rare ${weights.rare || 0}%</span><span>Epic ${weights.epic || 0}%</span><span>Legendary ${weights.legendary || 0}%</span><span>Mythic ${weights.mythic || 0}%</span></div>
+      <div class="shop-actions"><span class="price">${c.price} poin</span><button class="btn primary small crate-open-btn" ${points < c.price ? 'disabled' : ''} onclick="openCrate('${c.id}')">Open Crate</button></div>
+    </div>`;
+  }).join('')}</div><div class="mini-note">Animasi crate memakai model spinner seperti case opening game: reward tetap ditentukan server, lalu animasi menampilkan suspense sebelum hadiah masuk inventory.</div>`;
+}
+let crateAnimationTimer = null;
+function buildFakeRewardPool(finalReward, crate) {
+  const rarities = ['common','rare','common','epic','common','rare','legendary','common','rare','epic','common','mythic'];
+  const names = ['Moon Shard','Fang Token','Village Coin','Mystic Dust','Hunter Mark','Guard Core','Royal Glow','Blood Spark','Seer Prism','Lucky Drop','Shadow Chip','Legend Core'];
+  const pool = [];
+  for (let i = 0; i < 44; i++) {
+    const rarity = rarities[(i + Math.floor(Math.random()*rarities.length)) % rarities.length];
+    pool.push({ rarity, name: names[i % names.length], asset: rarityAsset(rarity) });
+  }
+  const finalIndex = 38;
+  pool[finalIndex] = { rarity: finalReward.rarity || 'rare', name: finalReward.name || 'Reward', asset: rewardAsset(finalReward), final: true };
+  return { pool, finalIndex };
+}
+function showCrateOpening(crateId, reward, done) {
+  const crate = crateCatalog.find(c => c.id === crateId) || {};
+  if (!els.crateOpening || !els.caseRail) { done?.(); return; }
+  clearTimeout(crateAnimationTimer);
+  els.crateOpeningTitle.textContent = crate.name || 'Opening Crate';
+  els.crateOpeningPrice.textContent = reward.rarityLabel || 'Rolling...';
+  els.crateOpeningAsset.src = crateAsset(crateId);
+  els.crateResult.classList.add('hidden');
+  els.crateOpening.classList.remove('hidden');
+  const { pool, finalIndex } = buildFakeRewardPool(reward, crate);
+  els.caseRail.className = 'case-rail';
+  els.caseRail.style.transition = 'none';
+  els.caseRail.style.transform = 'translate3d(0,0,0)';
+  els.caseRail.innerHTML = pool.map((it, idx) => `<div class="case-item rarity-${escapeHtml(it.rarity)} ${it.final ? 'final-slot' : ''}"><img src="${it.asset}" alt="item"><b>${escapeHtml(it.name)}</b><span>${escapeHtml(it.rarity)}</span></div>`).join('');
+  requestAnimationFrame(() => {
+    const itemW = 126;
+    const center = Math.max(0, (els.crateOpening.querySelector('.case-spinner')?.clientWidth || 580) / 2 - itemW / 2);
+    const jitter = Math.floor(Math.random() * 42) - 21;
+    const distance = -(finalIndex * itemW) + center + jitter;
+    els.caseRail.style.transition = 'transform 4.6s cubic-bezier(.08,.72,.12,1)';
+    els.caseRail.style.transform = `translate3d(${distance}px,0,0)`;
+  });
+  crateAnimationTimer = setTimeout(() => {
+    els.caseRail.classList.add('settled');
+    els.crateResultAsset.src = rewardAsset(reward);
+    els.crateResultRarity.textContent = reward.rarityLabel || 'Reward';
+    els.crateResultName.textContent = `${reward.name || 'Hadiah'}${reward.qty ? ' x' + reward.qty : ''}`;
+    els.crateResultDesc.textContent = reward.type === 'points' ? 'Poin langsung ditambahkan ke profil.' : 'Item sudah masuk ke inventory kamu.';
+    els.crateResultCard.className = `crate-result-card rarity-${reward.rarity || 'common'}`;
+    els.crateResult.classList.remove('hidden');
+    if (['legendary','mythic'].includes(String(reward.rarity))) launchConfetti();
+    done?.();
+  }, 4900);
+}
+function closeCrateOpening() {
+  clearTimeout(crateAnimationTimer);
+  els.crateOpening?.classList.add('hidden');
+}
+els.crateDoneBtn?.addEventListener('click', closeCrateOpening);
+els.crateSkipBtn?.addEventListener('click', closeCrateOpening);
+function launchConfetti() {
+  const wrap = document.createElement('div');
+  wrap.className = 'loot-confetti';
+  wrap.innerHTML = Array.from({ length: 28 }, (_, i) => `<i style="--x:${Math.random()*100}vw;--d:${Math.random()*1.8+1.2}s;--r:${Math.random()*360}deg"></i>`).join('');
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 2600);
 }
 window.openCrate = (crateId) => {
-  setUiLoading(true, 'Membuka crate...');
+  const crate = crateCatalog.find(c => c.id === crateId) || {};
+  if (els.crateOpening) {
+    els.crateOpening.classList.remove('hidden');
+    els.crateOpeningTitle.textContent = crate.name || 'Opening Crate';
+    els.crateOpeningPrice.textContent = 'Menghubungi server...';
+    els.crateOpeningAsset.src = crateAsset(crateId);
+    els.caseRail.innerHTML = '<div class="case-loading">Menyiapkan crate...</div>';
+    els.crateResult.classList.add('hidden');
+  } else setUiLoading(true, 'Membuka crate...');
   socket.emit('crate:open', { crateId }, (res) => {
-    softHideLoader(300);
-    if (!res?.ok) return toast('Open crate gagal', res?.error || 'Poin belum cukup.');
-    if (res.profile) accountProfile = res.profile;
+    softHideLoader(250);
+    if (!res?.ok) { closeCrateOpening(); return toast('Open crate gagal', res?.error || 'Poin belum cukup.'); }
     const r = res.reward || {};
+    if (res.profile) accountProfile = res.profile;
     renderAccountHub();
     if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
-    showCinematic({ type: 'crate', title: `${r.rarityEmoji || '🎁'} ${r.rarityLabel || 'Reward'}!`, text: `${r.emoji || ''} ${r.name || 'Hadiah'} ${r.qty ? 'x'+r.qty : ''}`, aura: r.rarity || 'amber' });
-    toast('Crate terbuka', `${r.rarityLabel || 'Reward'}: ${r.name || 'Hadiah'}`);
+    showCrateOpening(crateId, r, () => {
+      pushInventoryToast(r);
+      toast('Crate terbuka', rewardLabel(r));
+    });
   });
 };
 

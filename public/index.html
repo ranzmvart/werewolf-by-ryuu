@@ -248,6 +248,36 @@
       </div>
     </div>
 
+    <section id="crateOpening" class="crate-opening hidden" aria-label="Open Crate Animation">
+      <div class="crate-opening-shell glass">
+        <button id="crateSkipBtn" class="crate-skip" type="button" aria-label="Lewati animasi">×</button>
+        <div class="crate-stage-head">
+          <div>
+            <span class="crate-kicker">Ryuu Crate System</span>
+            <h2 id="crateOpeningTitle">Opening Crate</h2>
+          </div>
+          <div id="crateOpeningPrice" class="crate-price-pill">Rolling...</div>
+        </div>
+        <div class="crate-case-3d">
+          <img id="crateOpeningAsset" src="/assets/crate-moon.svg" alt="crate asset" />
+          <span></span><i></i>
+        </div>
+        <div class="case-spinner">
+          <div class="case-pointer"></div>
+          <div id="caseRail" class="case-rail"></div>
+        </div>
+        <div id="crateResult" class="crate-result hidden">
+          <div id="crateResultCard" class="crate-result-card">
+            <img id="crateResultAsset" src="/assets/inventory-box.svg" alt="reward" />
+            <span id="crateResultRarity">Reward</span>
+            <b id="crateResultName">Item</b>
+            <small id="crateResultDesc">Masuk ke inventory.</small>
+          </div>
+          <button id="crateDoneBtn" class="btn primary" type="button">Ambil Hadiah</button>
+        </div>
+      </div>
+    </section>
+
     <div id="toastStack" class="toast-stack"></div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
