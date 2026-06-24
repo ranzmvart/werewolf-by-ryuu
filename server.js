@@ -626,6 +626,7 @@ function newRoom(code, hostPlayerId, hostName, options = {}) {
     nightActions: new Map(),
     votes: new Map(),
     mayorVotes: new Map(),
+    mayorResolved: false,
     voice: new Set(),
     invitedAccounts: new Set(),
     music: {
@@ -830,6 +831,7 @@ function startGame(room) {
   room.nightActions.clear();
   room.votes.clear();
   room.mayorVotes.clear();
+  room.mayorResolved = false;
   room.hunterQueue = [];
   room.hunterNext = null;
   room.gameOver = null;
@@ -867,7 +869,10 @@ function startGame(room) {
 }
 
 function startMayorVote(room) {
+  clearRoomTimer(room);
+  if (!rooms.has(room.code) || room.phase === 'gameOver') return;
   room.mayorVotes.clear();
+  room.mayorResolved = false;
   narrative(room, 'Pemilihan Kepala Desa', 'Semua pemain hidup memilih Kades. Saat voting eliminasi, suara Kades bernilai 2.', 'amber');
   setPhase(room, 'mayorVote', room.settings.mayorVoteSec, () => resolveMayorVote(room));
 }
@@ -879,6 +884,9 @@ function getMayorVoteState(room) {
 }
 
 function resolveMayorVote(room) {
+  if (!room || room.mayorResolved || room.phase !== 'mayorVote') return;
+  room.mayorResolved = true;
+  clearRoomTimer(room);
   const alive = alivePlayers(room);
   if (!alive.length) return;
   const counts = new Map();
@@ -1404,6 +1412,7 @@ function resetRoom(room, options = {}) {
   room.nightActions.clear();
   room.votes.clear();
   room.mayorVotes.clear();
+  room.mayorResolved = false;
   room.hunterQueue = [];
   room.hunterNext = null;
   room.gameOver = null;
@@ -1983,9 +1992,13 @@ io.on('connection', socket => {
     const room = ctx?.room;
     const voter = ctx?.player;
     const target = room?.players.get(targetId);
-    if (!room || room.phase !== 'mayorVote' || !voter?.alive || !target?.alive) return;
+    if (!room || room.phase !== 'mayorVote' || room.mayorResolved || !voter?.alive || !target?.alive) return;
     room.mayorVotes.set(voter.id, targetId);
+    personalAnim(voter.id, 'vote', 'Vote Kades Terkunci', `Kamu memilih ${target.name} sebagai Kepala Desa.`, { aura: 'amber' });
     sendState(room);
+    if (room.mayorVotes.size >= alivePlayers(room).length) {
+      setTimeout(() => { if (room.phase === 'mayorVote' && !room.mayorResolved) resolveMayorVote(room); }, 650);
+    }
   });
 
   socket.on('night:action', data => {
@@ -2143,6 +2156,7 @@ function serializeRoom(room) {
     nightActions: [...(room.nightActions || new Map()).entries()],
     votes: [...(room.votes || new Map()).entries()],
     mayorVotes: [...(room.mayorVotes || new Map()).entries()],
+    mayorResolved: !!room.mayorResolved,
     invitedAccounts: [...(room.invitedAccounts || new Set()).values()],
     music: room.music || {},
     hunterQueue: room.hunterQueue || [],
@@ -2170,6 +2184,7 @@ function hydrateRoom(raw) {
   room.nightActions = new Map(raw.nightActions || []);
   room.votes = new Map(raw.votes || []);
   room.mayorVotes = new Map(raw.mayorVotes || []);
+  room.mayorResolved = !!raw.mayorResolved;
   room.invitedAccounts = new Set(raw.invitedAccounts || []);
   room.voice = new Set();
   room.music = raw.music || room.music;

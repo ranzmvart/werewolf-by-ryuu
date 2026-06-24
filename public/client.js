@@ -84,6 +84,11 @@ let me = null;
 let latestRoomList = [];
 let timerInterval = null;
 let selectedActionType = 'heal';
+let reconnectInFlight = false;
+let lastReconnectAttemptAt = 0;
+let lastAutoReconnectAt = 0;
+let activeGameTab = localStorage.getItem('ryuuGameTab') || 'actions';
+let mayorVoteLockedTarget = null;
 let localStream = null;
 let muted = false;
 const peers = new Map();
@@ -283,26 +288,34 @@ function renderResumeBox() {
   if (session?.code) els.resumeText.textContent = `Room ${session.code} tersimpan. Klik reconnect untuk masuk ulang.`;
 }
 
-function reconnectFromSavedSession(showError = true) {
+function reconnectFromSavedSession(showError = true, reason = 'manual') {
   const session = getSession();
   if (!session?.code || !session?.playerId) {
     if (showError) toast('Tidak ada session', 'Belum ada room terakhir untuk reconnect.');
     return;
   }
+  const now = Date.now();
+  if (reconnectInFlight) return;
+  if (!showError && now - lastAutoReconnectAt < 4500) return;
+  if (now - lastReconnectAttemptAt < 900) return;
+  lastReconnectAttemptAt = now;
+  if (!showError) lastAutoReconnectAt = now;
+  reconnectInFlight = true;
   setConnectionStatus('reconnecting', 'Reconnecting...');
-  setUiLoading(true, 'Menghubungkan ulang ke room...');
-  const name = els.nameInput.value.trim() || localStorage.getItem('werewolfName') || 'Player';
-  socket.emit('room:reconnect', { code: session.code, playerId: session.playerId, name }, (res) => {
+  if (showError) setUiLoading(true, 'Menghubungkan ulang ke room...');
+  const name = accountProfile?.username || els.nameInput.value.trim() || localStorage.getItem('werewolfName') || 'Player';
+  socket.emit('room:reconnect', { code: session.code, playerId: session.playerId, name, reason }, (res) => {
+    reconnectInFlight = false;
     if (!res?.ok) {
       setConnectionStatus(socket.connected ? 'online' : 'offline', socket.connected ? 'Online' : 'Offline');
       if (showError) toast('Reconnect gagal', res?.error || 'Session sudah tidak tersedia.');
-      softHideLoader(250);
+      if (showError) softHideLoader(250);
       return;
     }
     saveSession(res.code, res.playerId);
     enterGame();
-    toast('Reconnect berhasil', `Kamu kembali ke room ${res.code}.`);
-    softHideLoader(550);
+    if (showError) toast('Reconnect berhasil', `Kamu kembali ke room ${res.code}.`);
+    softHideLoader(showError ? 550 : 120);
   });
 }
 
@@ -461,7 +474,7 @@ socket.on('connect', () => {
   requestRoomList(false);
   // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
   if (!els.game.classList.contains('hidden') && getSession()?.code) {
-    setTimeout(() => reconnectFromSavedSession(false), accountProfile ? 150 : 650);
+    setTimeout(() => reconnectFromSavedSession(false, 'socket-connect'), accountProfile ? 350 : 900);
   }
 });
 
@@ -508,7 +521,10 @@ socket.on('reward:summary', ({ points, won, profile } = {}) => {
 });
 
 socket.on('room:state', (state) => {
+  const prevPhase = roomState?.phase;
   roomState = state;
+  if (state?.phase !== 'mayorVote') mayorVoteLockedTarget = null;
+  if (prevPhase !== state?.phase && ['mayorVote','night','voting','hunter'].includes(state?.phase)) setGameTab('actions', true);
   if (state?.code && me?.id) saveSession(state.code, me.id);
   renderAll();
 });
@@ -716,11 +732,17 @@ function actionButton(p, mode) {
     const count = roomState.mayorState?.counts?.[p.id] || 0;
     meta = `${count} vote Kades`;
   } else meta = p.alive ? 'Pilih target' : 'Mati';
-  return `<button class="target ${p.alive ? '' : 'dead'}" onclick="doAction('${mode}','${p.id}')"><span class="name">${escapeHtml(p.name)}</span><span class="meta">${escapeHtml(meta)}</span></button>`;
+  const selected = (mode === 'mayor' && mayorVoteLockedTarget === p.id) || (mode === 'vote' && me?.voteTarget === p.id) || (me?.mayorVoteTarget === p.id && mode === 'mayor');
+  return `<button class="target ${p.alive ? '' : 'dead'} ${selected ? 'selected' : ''}" ${selected ? 'disabled' : ''} onclick="doAction('${mode}','${p.id}')"><span class="name">${escapeHtml(p.name)}</span><span class="meta">${selected ? 'Terkunci' : escapeHtml(meta)}</span></button>`;
 }
 
 window.doAction = (mode, id) => {
-  if (mode === 'mayor') return socket.emit('mayor:vote', { targetId: id });
+  if (mode === 'mayor') {
+    if (mayorVoteLockedTarget) return toast('Vote Kades sudah terkunci', 'Kamu sudah memilih Kades untuk fase ini.');
+    mayorVoteLockedTarget = id;
+    renderActions();
+    return socket.emit('mayor:vote', { targetId: id });
+  }
   if (mode === 'vote') return socket.emit('vote:cast', { targetId: id });
   if (mode === 'hunter') return socket.emit('hunter:shoot', { targetId: id });
   if (mode === 'wolfKill') return socket.emit('night:action', { targetId: id, type: 'kill' });
@@ -760,9 +782,9 @@ function showCinematic(a) {
       scene.className = 'cinematic-3d-scene';
       card.insertBefore(scene, card.firstChild);
     }
-    scene.innerHTML = `<span class="scene-moon"></span><span class="scene-shadow"></span><span class="scene-actor asset-actor"><img src="${actorAsset}" alt="scene"></span><span class="scene-target asset-target"><img src="${targetAsset}" alt="target"></span><span class="scene-particles"></span>`;
+    scene.innerHTML = `<span class="scene-moon"></span><span class="scene-shadow"></span><span class="scene-actor asset-actor"><img src="${actorAsset}" alt=""></span><span class="scene-target asset-target"><img src="${targetAsset}" alt=""></span><span class="scene-particles"></span>`;
   }
-  els.cinematicIcon.innerHTML = `<img class="cinematic-main-asset" src="${actorAsset}" alt="event">`;
+  els.cinematicIcon.innerHTML = `<img class="cinematic-main-asset" src="${actorAsset}" alt="">`;
   els.cinematicTitle.textContent = a.title || 'Event';
   els.cinematicText.textContent = a.text || '';
   els.cinematicTitle.className = a.aura || '';
@@ -841,7 +863,7 @@ function autoLoginAccount() {
       latestLeaderboards = res.leaderboards || latestLeaderboards;
       renderAccountHub();
       if (!els.game.classList.contains('hidden') && getSession()?.code) {
-        setTimeout(() => reconnectFromSavedSession(false), 180);
+        setTimeout(() => reconnectFromSavedSession(false, 'auto-login'), 350);
       }
     } else renderAccountHub();
   });
@@ -2078,4 +2100,52 @@ window.addEventListener('beforeunload', () => {
   renderMusicList();
   renderRoomMusicControls();
   musicEls.title.textContent = 'Cari lagu untuk mulai';
+})();
+
+
+// === v3.9 Game Room Polish: mobile game tabs, asset fallback, reconnect guard helpers ===
+(function initGameRoomPolish(){
+  const fallbackSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#1e293b"/><stop offset="1" stop-color="#020617"/></linearGradient></defs><rect width="220" height="220" rx="34" fill="url(#g)"/><circle cx="110" cy="92" r="42" fill="#7c3aed" opacity=".55"/><path d="M55 165c22-28 88-28 110 0" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" fill="none" opacity=".75"/><text x="110" y="202" text-anchor="middle" font-family="Arial" font-size="20" font-weight="700" fill="#cbd5e1">RYUU</text></svg>`);
+  const fallbackSrc = `data:image/svg+xml;charset=utf-8,${fallbackSvg}`;
+  document.addEventListener('error', (event) => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    if (img.dataset.fallbackApplied === '1') return;
+    img.dataset.fallbackApplied = '1';
+    img.removeAttribute('alt');
+    img.src = fallbackSrc;
+    img.classList.add('asset-fallback-img');
+  }, true);
+
+  function ensureGameTabbar(){
+    if (document.getElementById('gameTabbar')) return;
+    const game = document.getElementById('game');
+    const topbar = game?.querySelector('.topbar');
+    if (!game || !topbar) return;
+    const nav = document.createElement('nav');
+    nav.id = 'gameTabbar';
+    nav.className = 'game-tabbar glass';
+    nav.innerHTML = `
+      <button type="button" data-game-tab="actions">Aksi</button>
+      <button type="button" data-game-tab="role">Role</button>
+      <button type="button" data-game-tab="players">Pemain</button>
+      <button type="button" data-game-tab="chat">Chat</button>
+      <button type="button" data-game-tab="logs">Log</button>`;
+    topbar.insertAdjacentElement('afterend', nav);
+    nav.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-game-tab]');
+      if (!btn) return;
+      setGameTab(btn.dataset.gameTab);
+    });
+    setGameTab(activeGameTab || 'actions', true);
+  }
+  window.setGameTab = function(tab, silent = false){
+    activeGameTab = tab || 'actions';
+    localStorage.setItem('ryuuGameTab', activeGameTab);
+    document.body.dataset.gameTab = activeGameTab;
+    document.querySelectorAll('#gameTabbar [data-game-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.gameTab === activeGameTab));
+    if (!silent && window.innerWidth <= 760) window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  ensureGameTabbar();
+  window.addEventListener('resize', ensureGameTabbar);
 })();

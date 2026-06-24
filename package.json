@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "3.8.0",
-  "description": "Werewolf by Ryuu - Real Pages Clean UI Final",
+  "version": "3.9.0",
+  "description": "Werewolf by Ryuu - Game UI Reconnect Assets Fix Final",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

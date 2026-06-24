@@ -1,22 +1,29 @@
-# Werewolf by Ryuu v3.8 Crate + Floating Music Polish
+# Werewolf by Ryuu v3.9 - Game UI, Reconnect, Asset Fix
 
-Versi ini mempertahankan semua fitur v3.7, lalu memperbaiki dua bagian utama:
+Versi ini memperbaiki tampilan saat bermain di HP/laptop, bug reconnect saat vote Kepala Desa, dan fallback asset agar gambar yang gagal load tidak menampilkan teks kosong seperti scene/image.
 
-- Crate opening di HP lebih stabil: rail tidak kosong setelah spin, asset reward lebih kecil, teks tidak tertutup.
-- Music player menjadi floating draggable: saat minimize hanya tampil tombol kecil, bisa digeser, dan tidak menutupi halaman.
+## Fix utama
 
-## Deploy
+- Layout game room HP dibuat tab: Aksi, Role, Pemain, Chat, Log.
+- Layout laptop tetap 3 panel rapi dan proporsional.
+- Vote Kepala Desa dikunci setelah memilih dan auto resolve jika semua pemain sudah vote.
+- Reconnect diberi guard/cooldown agar tidak spam reconnect berulang.
+- Mayor vote tidak diulang karena resolve ganda.
+- Asset gambar punya fallback otomatis kalau gagal load.
+- Alt text gambar scene tidak lagi muncul sebagai teks jika asset gagal.
+- Semua fitur lama tetap dipertahankan.
 
-Upload isi folder ini ke root repo GitHub Railway kamu:
+## Deploy Railway
+
+Upload isi folder ini ke root repo GitHub:
 
 ```text
 public/
 package.json
 railway.json
 Dockerfile
-server.js
 README.md
-ASSET_CREDITS.md
+server.js
 ```
 
-Jangan upload sebagai folder ganda. Railway akan redeploy otomatis.
+Pastikan Railway memakai Node 22 dan Volume tetap mount ke `/app/data` agar data akun/room tetap tersimpan.
