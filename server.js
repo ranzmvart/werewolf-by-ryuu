@@ -1588,6 +1588,31 @@ function getAuthenticatedUser(socket) {
   const key = authSessions.get(socket.id);
   return { key, user: getUserByKey(key) };
 }
+
+// Safe auth restore: Socket.IO gets a new socket.id after reconnect/redeploy,
+// so the browser can include saved username+PIN in room actions.
+// This prevents the server from saying "Belum login" even though the UI is already logged in.
+function authenticateSocket(socket, auth = {}) {
+  let key = authSessions.get(socket.id);
+  let user = getUserByKey(key);
+  if (user) return { key, user };
+
+  const username = auth?.username;
+  const pin = auth?.pin;
+  if (!username || !pin) return { key: null, user: null };
+
+  const tryKey = usernameKey(username);
+  const tryUser = getUserByKey(tryKey);
+  if (!tryUser) return { key: null, user: null };
+  if (pinHash(pin, tryUser.salt) !== tryUser.pinHash) return { key: null, user: null };
+
+  normalizeUser(tryUser);
+  tryUser.lastLoginAt = Date.now();
+  tryUser.updatedAt = Date.now();
+  authSessions.set(socket.id, tryKey);
+  saveDbSoon();
+  return { key: tryKey, user: tryUser };
+}
 function socialPush(key) {
   const user = getUserByKey(key);
   if (!user) return;
@@ -1791,9 +1816,8 @@ io.on('connection', socket => {
     cb?.({ ok: true, rooms: list });
   });
 
-  socket.on('room:create', ({ name, roomName, password, clientId } = {}, cb) => {
-    const accountKey = authSessions.get(socket.id);
-    const profile = getUserByKey(accountKey);
+  socket.on('room:create', ({ name, roomName, password, clientId, auth } = {}, cb) => {
+    const { key: accountKey, user: profile } = authenticateSocket(socket, auth);
     if (!profile) return cb?.({ ok: false, error: 'Login / daftar dulu sebelum membuat room.' });
     leaveCurrentRoom(socket, true);
     const code = makeCode();
@@ -1835,9 +1859,8 @@ io.on('connection', socket => {
     cb?.({ ok: true, code, playerId });
   });
 
-  socket.on('room:join', ({ code, name, password, clientId } = {}, cb) => {
-    const accountKey = authSessions.get(socket.id);
-    const profile = getUserByKey(accountKey);
+  socket.on('room:join', ({ code, name, password, clientId, auth } = {}, cb) => {
+    const { key: accountKey, user: profile } = authenticateSocket(socket, auth);
     if (!profile) return cb?.({ ok: false, error: 'Login / daftar dulu sebelum join room.' });
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return cb?.({ ok: false, error: 'Room tidak ditemukan.' });
@@ -1884,11 +1907,10 @@ io.on('connection', socket => {
     cb?.({ ok: true, code: room.code, playerId: p.id });
   });
 
-  socket.on('room:reconnect', ({ code, playerId, name } = {}, cb) => {
+  socket.on('room:reconnect', ({ code, playerId, name, auth } = {}, cb) => {
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return cb?.({ ok: false, error: 'Room reconnect tidak ditemukan. Jika Railway baru restart/redeploy, room lama memang hilang.' });
-    const accountKey = authSessions.get(socket.id);
-    const profile = getUserByKey(accountKey);
+    const { key: accountKey, user: profile } = authenticateSocket(socket, auth);
     const player = findReconnectCandidate(room, playerId, accountKey, profile?.username || name);
     if (!player) return cb?.({ ok: false, error: 'Session pemain tidak ditemukan. Login akun yang sama atau join ulang jika game masih lobby.' });
     reconnectPlayer(socket, room, player, profile?.username || name, cb, 'reconnect');

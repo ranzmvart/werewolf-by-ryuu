@@ -27,3 +27,9 @@ server.js
 ```
 
 Pastikan Railway memakai Node 22 dan Volume tetap mount ke `/app/data` agar data akun/room tetap tersimpan.
+
+
+## v4.0 Auth Room Fix
+- Memperbaiki bug setelah login tetapi create/join room dianggap belum login.
+- Auth session sekarang otomatis dipulihkan saat Socket.IO reconnect atau Railway restart.
+- Create, join, dan reconnect room membawa auth aman dari browser agar tidak gagal.

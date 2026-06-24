@@ -304,7 +304,7 @@ function reconnectFromSavedSession(showError = true, reason = 'manual') {
   setConnectionStatus('reconnecting', 'Reconnecting...');
   if (showError) setUiLoading(true, 'Menghubungkan ulang ke room...');
   const name = accountProfile?.username || els.nameInput.value.trim() || localStorage.getItem('werewolfName') || 'Player';
-  socket.emit('room:reconnect', { code: session.code, playerId: session.playerId, name, reason }, (res) => {
+  socket.emit('room:reconnect', { code: session.code, playerId: session.playerId, name, reason, auth: authPayload() }, (res) => {
     reconnectInFlight = false;
     if (!res?.ok) {
       setConnectionStatus(socket.connected ? 'online' : 'offline', socket.connected ? 'Online' : 'Offline');
@@ -335,7 +335,7 @@ els.createBtn.onclick = () => {
   localStorage.setItem('werewolfName', name);
   localStorage.setItem('werewolfRoomName', roomName);
   setUiLoading(true, 'Membuat room...');
-  socket.emit('room:create', { name, roomName, password, clientId }, (res) => {
+  socket.emit('room:create', { name, roomName, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal buat room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
@@ -351,7 +351,7 @@ els.joinBtn.onclick = () => {
   localStorage.setItem('werewolfName', name);
   const password = els.roomPasswordInput?.value?.trim() || '';
   setUiLoading(true, 'Masuk ke room...');
-  socket.emit('room:join', { name, code, password, clientId }, (res) => {
+  socket.emit('room:join', { name, code, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
@@ -407,7 +407,7 @@ window.joinListedRoom = (code, hasPassword) => {
   els.codeInput.value = code;
   if (els.roomPasswordInput && password) els.roomPasswordInput.value = password;
   setUiLoading(true, 'Masuk ke room...');
-  socket.emit('room:join', { name, code, password, clientId }, (res) => {
+  socket.emit('room:join', { name, code, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
     saveSession(res.code, res.playerId || clientId);
     enterGame();
@@ -470,7 +470,7 @@ els.chatForm.onsubmit = (e) => {
 
 socket.on('connect', () => {
   setConnectionStatus('online', 'Online');
-  autoLoginAccount();
+  autoLoginAccount(true);
   requestRoomList(false);
   // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
   if (!els.game.classList.contains('hidden') && getSession()?.code) {
@@ -850,10 +850,19 @@ function itemEmoji(id) { return itemById(id)?.emoji || '🎁'; }
 function frameClass(id) { return itemById(id)?.className || ''; }
 function savedAuth() { try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch { return null; } }
 function saveAuth(username, pin) { localStorage.setItem(AUTH_KEY, JSON.stringify({ username, pin })); }
-
-function autoLoginAccount() {
+function authPayload() {
   const saved = savedAuth();
-  if (!saved?.username || !saved?.pin || accountProfile) return;
+  if (saved?.username && saved?.pin) return saved;
+  const username = accountProfile?.username || els.authName?.value?.trim() || '';
+  const pin = els.authPin?.value?.trim() || '';
+  return { username, pin };
+}
+
+function autoLoginAccount(force = false) {
+  const saved = savedAuth();
+  if (!saved?.username || !saved?.pin) { renderAccountHub(); return; }
+  // Force re-auth after Socket.IO reconnect because the server auth session is tied to socket.id.
+  if (!force && accountProfile) { renderAccountHub(); return; }
   socket.emit('auth:login', saved, (res) => {
     if (res?.ok) {
       accountProfile = res.profile;
@@ -861,11 +870,14 @@ function autoLoginAccount() {
       crateCatalog = res.crates || crateCatalog;
       latestSocial = res.social || latestSocial;
       latestLeaderboards = res.leaderboards || latestLeaderboards;
+      els.nameInput.value = accountProfile.username;
       renderAccountHub();
       if (!els.game.classList.contains('hidden') && getSession()?.code) {
         setTimeout(() => reconnectFromSavedSession(false, 'auto-login'), 350);
       }
-    } else renderAccountHub();
+    } else {
+      if (!accountProfile) renderAccountHub();
+    }
   });
 }
 
