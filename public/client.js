@@ -285,6 +285,25 @@ function clearSession() {
   renderResumeBox();
 }
 
+function resetLocalRoomStateForFreshJoin() {
+  // Bersihkan bekas room lama di sisi browser supaya saat pindah room state benar-benar fresh.
+  roomState = null;
+  me = null;
+  selectedActionType = 'heal';
+  mayorVoteLockedTarget = null;
+  activeGameTab = 'actions';
+  reconnectInFlight = false;
+  lastReconnectAttemptAt = 0;
+  lastAutoReconnectAt = 0;
+  hadSocketDisconnect = false;
+  allowAutoReconnectOnce = false;
+  localStorage.setItem('ryuuGameTab', activeGameTab);
+  if (localStream) leaveVoice();
+  peers.forEach(pc => pc.close());
+  peers.clear();
+  if (els.remoteAudios) els.remoteAudios.innerHTML = '';
+}
+
 function renderResumeBox() {
   const session = getSession();
   if (!els.resumeBox) return;
@@ -350,6 +369,7 @@ els.createBtn.onclick = () => {
   setUiLoading(true, 'Membuat room...');
   socket.emit('room:create', { name, roomName, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal buat room', res?.error || 'Coba lagi.'); }
+    resetLocalRoomStateForFreshJoin();
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -366,6 +386,7 @@ els.joinBtn.onclick = () => {
   setUiLoading(true, 'Masuk ke room...');
   socket.emit('room:join', { name, code, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
+    resetLocalRoomStateForFreshJoin();
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -422,6 +443,7 @@ window.joinListedRoom = (code, hasPassword) => {
   setUiLoading(true, 'Masuk ke room...');
   socket.emit('room:join', { name, code, password, clientId, auth: authPayload() }, (res) => {
     if (!res?.ok) { softHideLoader(250); return toast('Gagal join room', res?.error || 'Coba lagi.'); }
+    resetLocalRoomStateForFreshJoin();
     saveSession(res.code, res.playerId || clientId);
     enterGame();
   });
@@ -1257,7 +1279,17 @@ window.addFriend = (username) => socket.emit('social:request', { username }, (re
 window.acceptFriend = (username) => socket.emit('social:accept', { username }, (res) => { if (!res?.ok) return toast('Gagal terima', res?.error || 'Coba lagi.'); latestSocial = res.social || latestSocial; refreshAccountPage(); toast('Teman baru', `${username} sekarang temanmu.`); });
 window.removeFriend = (username) => socket.emit('social:remove', { username }, (res) => { if (!res?.ok) return toast('Gagal hapus', res?.error || 'Coba lagi.'); latestSocial = res.social || latestSocial; refreshAccountPage(); toast('Teman dihapus', username); });
 window.inviteFriend = (username) => socket.emit('social:invite-room', { username }, (res) => { if (!res?.ok) return toast('Gagal invite', res?.error || 'Kamu harus berada di room.'); toast('Invite dikirim', `${username} diajak ke lobby ${res.invite?.code || ''}`); });
-window.joinInviteRoom = (code) => { els.codeInput.value = code; socket.emit('room:join', { name: accountProfile?.username || '', code, password: '', clientId }, (res) => { if (!res?.ok) return toast('Gagal join invite', res?.error || 'Coba lagi.'); saveSession(res.code, res.playerId || clientId); enterGame(); }); };
+window.joinInviteRoom = (code) => {
+  if (!accountProfile) return toast('Login dulu', 'Login dulu sebelum menerima invite room.');
+  els.codeInput.value = code;
+  setUiLoading(true, 'Masuk ke room invite...');
+  socket.emit('room:join', { name: accountProfile?.username || '', code, password: '', clientId, auth: authPayload() }, (res) => {
+    if (!res?.ok) { softHideLoader(250); return toast('Gagal join invite', res?.error || 'Coba lagi.'); }
+    resetLocalRoomStateForFreshJoin();
+    saveSession(res.code, res.playerId || clientId);
+    enterGame();
+  });
+};
 
 function renderGameProfileBox() {
   if (!els.gameProfileBox) return;

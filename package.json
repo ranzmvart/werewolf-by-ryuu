@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "4.4.0",
-  "description": "Werewolf by Ryuu v4.2 Hard Reconnect Kades Fix",
+  "version": "4.5.0",
+  "description": "Werewolf by Ryuu v4.5 Room Cleanup Auto Reset Fix",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

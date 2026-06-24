@@ -399,6 +399,8 @@ const HOST = '0.0.0.0';
 const rooms = new Map();
 const socketIndex = new Map(); // socket.id -> { code, playerId }
 const RECONNECT_TTL_MS = 1000 * 60 * 30;
+const GAME_AUTO_RESET_MS = 10000; // setelah game selesai, room cepat kembali ke lobby
+const EMPTY_LOBBY_DELETE_MS = 0; // lobby tanpa pemain online langsung dibersihkan
 
 const ROLE_META = {
   'Alpha Werewolf': {
@@ -523,7 +525,11 @@ function roomSummary(room) {
 
 function getPublicRooms() {
   return [...rooms.values()]
-    .filter(room => room.phase === 'lobby' && !room.gameStarted)
+    .filter(room => {
+      if (room.phase !== 'lobby' || room.gameStarted) return false;
+      const players = [...room.players.values()];
+      return players.length > 0 && players.some(p => p.connected);
+    })
     .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
     .slice(0, 50)
     .map(roomSummary);
@@ -531,6 +537,43 @@ function getPublicRooms() {
 
 function emitRoomList() {
   io.emit('rooms:list', getPublicRooms());
+}
+
+function clearDeletedRoom(room) {
+  if (!room) return;
+  clearRoomTimer(room);
+  clearAutoResetTimer(room);
+  room.voice?.clear?.();
+}
+
+function pruneEmptyRooms(reason = 'prune') {
+  let changed = false;
+  const now = Date.now();
+  for (const [code, room] of rooms.entries()) {
+    const players = [...room.players.values()];
+    const connected = players.filter(p => p.connected).length;
+    if (players.length === 0) {
+      clearDeletedRoom(room);
+      rooms.delete(code);
+      changed = true;
+      continue;
+    }
+    // Lobby yang tidak ada pemain online tidak perlu tampil/bertahan.
+    // Game yang sudah mulai tetap disimpan agar reconnect/redeploy masih bisa pulih.
+    if (room.phase === 'lobby' && !room.gameStarted && connected === 0) {
+      if (!room.lastEmptyAt) room.lastEmptyAt = now;
+      if (now - room.lastEmptyAt >= EMPTY_LOBBY_DELETE_MS) {
+        clearDeletedRoom(room);
+        rooms.delete(code);
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    emitRoomList();
+    saveRoomsSoon?.();
+  }
+  return changed;
 }
 
 function publicMusic(music = {}) {
@@ -1440,7 +1483,7 @@ function endGame(room, winningTeam, reason) {
   room.phase = 'gameOver';
   room.gameOver = { winningTeam, reason, at: Date.now() };
   awardEndGame(room, winningTeam);
-  room.autoResetAt = Date.now() + 25000;
+  room.autoResetAt = Date.now() + GAME_AUTO_RESET_MS;
   for (const p of room.players.values()) p.publicRole = p.role;
   for (const p of room.players.values()) {
     const team = ROLE_META[p.role]?.team;
@@ -1449,12 +1492,12 @@ function endGame(room, winningTeam, reason) {
   }
   roomAnim(room, winningTeam === 'werewolf' ? 'wolfWin' : winningTeam === 'jester' ? 'jesterWin' : 'villageWin', 'Game Selesai', reason, { winningTeam });
   addLog(room, `Game selesai: ${reason}`, 'gameOver');
-  addLog(room, 'Room akan otomatis kembali ke lobby dalam 25 detik. Host juga bisa klik Reset Room untuk mulai ulang lebih cepat.', 'info');
+  addLog(room, 'Room akan otomatis kembali ke lobby dalam beberapa detik. Setelah itu lobby terbuka lagi untuk ronde baru.', 'info');
   sendState(room);
   room.autoResetTimer = setTimeout(() => {
     if (!rooms.has(room.code) || room.phase !== 'gameOver') return;
     resetRoom(room, { auto: true });
-  }, 25000);
+  }, GAME_AUTO_RESET_MS);
 }
 
 
@@ -1630,13 +1673,73 @@ function leaveCurrentRoom(socket, silent = false) {
 
   if (![...room.players.values()].some(x => x.connected)) {
     room.lastEmptyAt = Date.now();
+    // Lobby kosong langsung dibersihkan supaya tidak muncul sebagai room mati.
+    // Game yang sudah mulai tetap disimpan agar pemain bisa reconnect/recover setelah jaringan putus.
+    if (room.phase === 'lobby' && !room.gameStarted) {
+      clearDeletedRoom(room);
+      rooms.delete(room.code);
+      emitRoomList();
+      saveRoomsSoon();
+      return;
+    }
     // Do not clear the game timer here. Timers must keep running so a reconnect does not freeze the game.
   }
 
   if (!silent) sendState(room);
+  else { emitRoomList(); saveRoomsSoon(); }
 }
 
 
+
+
+function hardLeaveCurrentRoom(socket, silent = false) {
+  const ref = socketIndex.get(socket.id);
+  if (!ref) return;
+  const room = rooms.get(ref.code);
+  const p = room?.players.get(ref.playerId);
+  if (!room || !p) {
+    socketIndex.delete(socket.id);
+    return;
+  }
+
+  socket.leave(room.code);
+  socket.leave(p.id);
+  socketIndex.delete(socket.id);
+  room.voice.delete(p.id);
+  io.to(room.code).emit('voice:peer-left', { peerId: p.id });
+
+  const wasHost = room.hostId === p.id;
+  room.players.delete(p.id);
+  room.nightActions?.delete?.(p.id);
+  room.votes?.delete?.(p.id);
+  room.mayorVotes?.delete?.(p.id);
+  for (const [actor, action] of [...(room.nightActions || new Map()).entries()]) {
+    if (action?.target === p.id || action?.targets?.includes?.(p.id)) room.nightActions.delete(actor);
+  }
+
+  if (!silent) addLog(room, `${p.name} keluar dari room.`, 'warn');
+
+  if (wasHost) {
+    const next = [...room.players.values()].find(x => x.connected) || [...room.players.values()][0];
+    if (next) {
+      room.hostId = next.id;
+      addLog(room, `${next.name} menjadi host baru.`, 'info');
+    }
+  }
+
+  if (!room.players.size) {
+    clearDeletedRoom(room);
+    rooms.delete(room.code);
+    emitRoomList();
+    saveRoomsSoon();
+    return;
+  }
+
+  // Jika pemain pindah room saat lobby, pastikan state room lama tetap bersih.
+  if (room.phase === 'lobby' && !room.gameStarted) sanitizeLobbyState(room);
+  if (room.gameStarted && room.phase !== 'gameOver') checkWin(room);
+  sendState(room);
+}
 
 function chooseWeightedRarity(weights = {}) {
   const entries = Object.entries(weights).filter(([, w]) => Number(w) > 0);
@@ -1917,7 +2020,7 @@ io.on('connection', socket => {
   socket.on('room:create', ({ name, roomName, password, clientId, auth } = {}, cb) => {
     const { key: accountKey, user: profile } = authenticateSocket(socket, auth);
     if (!profile) return cb?.({ ok: false, error: 'Login / daftar dulu sebelum membuat room.' });
-    leaveCurrentRoom(socket, true);
+    hardLeaveCurrentRoom(socket, true);
     const code = makeCode();
     const playerId = accountKey || cleanClientId(clientId);
     const room = newRoom(code, playerId, profile.username, { roomName, password });
@@ -1970,7 +2073,7 @@ io.on('connection', socket => {
     if ((room.players.size || 0) >= (room.maxPlayers || 16)) return cb?.({ ok: false, error: 'Room sudah penuh.' });
     if (room.phase !== 'lobby') return cb?.({ ok: false, error: 'Game sudah dimulai. Login akun yang sama lalu tekan Reconnect untuk masuk ulang.' });
 
-    leaveCurrentRoom(socket, true);
+    hardLeaveCurrentRoom(socket, true);
     const p = {
       id: playerId,
       socketId: socket.id,
@@ -2020,19 +2123,7 @@ io.on('connection', socket => {
     const p = room?.players.get(ref.playerId);
     if (!room || !p) return;
     if (clear || room.phase === 'lobby') {
-      addLog(room, `${p.name} keluar dari room.`, 'warn');
-      room.voice.delete(p.id);
-      room.players.delete(p.id);
-      socket.leave(room.code);
-      socket.leave(p.id);
-      socketIndex.delete(socket.id);
-      io.to(room.code).emit('voice:peer-left', { peerId: p.id });
-      if (room.hostId === p.id) {
-        const next = [...room.players.values()].find(x => x.connected);
-        if (next) room.hostId = next.id;
-      }
-      if (!room.players.size) { rooms.delete(room.code); emitRoomList(); }
-      else sendState(room);
+      hardLeaveCurrentRoom(socket);
     } else {
       leaveCurrentRoom(socket);
     }
@@ -2333,7 +2424,7 @@ function saveRoomsSoon() {
   clearTimeout(saveRoomsTimer);
   saveRoomsTimer = setTimeout(() => {
     try {
-      const payload = { savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) };
+      const payload = { savedAt: Date.now(), rooms: [...rooms.values()].filter(room => room.players.size > 0 && !(room.phase === 'lobby' && !room.gameStarted && ![...room.players.values()].some(p => p.connected))).map(serializeRoom) };
       fs.writeFileSync(ROOMS_FILE, JSON.stringify(payload, null, 2));
     } catch (error) { console.error('[ROOMS] Gagal simpan rooms:', error.message); }
   }, 250);
@@ -2345,6 +2436,10 @@ function loadPersistedRooms() {
     const list = Array.isArray(raw.rooms) ? raw.rooms : [];
     for (const item of list) {
       if (!item?.code || rooms.has(item.code)) continue;
+      if (!Array.isArray(item.players) || item.players.length === 0) continue;
+      // Lobby yang dipersist sebelum restart tidak ditampilkan ulang jika tidak ada pemain online.
+      // Active game tetap dipulihkan agar reconnect masih bisa jalan.
+      if (!item.gameStarted && (item.phase || 'lobby') === 'lobby') continue;
       const room = hydrateRoom(item);
       rooms.set(room.code, room);
     }
@@ -2408,10 +2503,13 @@ function resumeRoomTimers(room, fromBoot = false) {
 loadPersistedRooms();
 
 setInterval(() => {
-  const cutoff = Date.now() - 1000 * 60 * 60 * 8;
   let changedRoomList = false;
   for (const [code, room] of rooms.entries()) {
-    if (![...room.players.values()].some(p => p.connected) && (room.lastEmptyAt || room.createdAt) < Date.now() - RECONNECT_TTL_MS) { rooms.delete(code); changedRoomList = true; continue; }
+    const players = [...room.players.values()];
+    const connected = players.some(p => p.connected);
+    if (!players.length) { clearDeletedRoom(room); rooms.delete(code); changedRoomList = true; continue; }
+    if (!connected && room.phase === 'lobby' && !room.gameStarted) { clearDeletedRoom(room); rooms.delete(code); changedRoomList = true; continue; }
+    if (!connected && (room.lastEmptyAt || room.createdAt) < Date.now() - RECONNECT_TTL_MS) { clearDeletedRoom(room); rooms.delete(code); changedRoomList = true; continue; }
     for (const [playerId, player] of room.players.entries()) {
       if (!player.connected && player.lastDisconnectAt && player.lastDisconnectAt < Date.now() - RECONNECT_TTL_MS && room.phase === 'lobby') {
         room.players.delete(playerId);
@@ -2420,10 +2518,10 @@ setInterval(() => {
     }
   }
   if (changedRoomList) { emitRoomList(); saveRoomsSoon(); }
-}, 1000 * 60 * 30);
+}, 1000 * 60);
 
-process.on('SIGTERM', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
-process.on('SIGINT', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
+process.on('SIGTERM', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].filter(room => room.players.size > 0 && !(room.phase === 'lobby' && !room.gameStarted && ![...room.players.values()].some(p => p.connected))).map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
+process.on('SIGINT', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].filter(room => room.players.size > 0 && !(room.phase === 'lobby' && !room.gameStarted && ![...room.players.values()].some(p => p.connected))).map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
 
 server.listen(PORT, HOST, () => {
   console.log(`Werewolf Online ready on port ${PORT}`);
