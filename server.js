@@ -727,6 +727,7 @@ function privateState(room, id) {
 }
 
 function sendState(room) {
+  sanitizeLobbyState(room);
   room.updatedAt = Date.now();
   io.to(room.code).emit('room:state', roomPublic(room));
   for (const p of room.players.values()) {
@@ -1479,6 +1480,24 @@ function clearPlayerRoundRoleState(p, keepAlive = true) {
   applyProfileToPlayer(p);
 }
 
+function sanitizeLobbyState(room) {
+  if (!room) return;
+  if (room.phase !== 'lobby' && room.gameStarted) return;
+  room.phase = 'lobby';
+  room.gameStarted = false;
+  room.roundId = null;
+  room.day = 0;
+  room.mayorResolved = false;
+  room.gameOver = null;
+  room.hunterQueue = [];
+  room.hunterNext = null;
+  room.nightEvent = null;
+  room.votes?.clear?.();
+  room.mayorVotes?.clear?.();
+  room.nightActions?.clear?.();
+  for (const player of room.players.values()) clearPlayerRoundRoleState(player, true);
+}
+
 function resetRoom(room, options = {}) {
   clearRoomTimer(room);
   clearAutoResetTimer(room);
@@ -1539,16 +1558,27 @@ function bindSocketToPlayer(socket, room, player) {
 
 
 function findReconnectCandidate(room, playerId, accountKey, name) {
-  const cleanedId = playerId ? cleanClientId(playerId) : '';
-  if (cleanedId && room.players.has(cleanedId)) return room.players.get(cleanedId);
   const key = accountKey ? String(accountKey).toLowerCase() : '';
+
+  // Login account is the strongest identity. This prevents a different account on the
+  // same browser/device from accidentally reconnecting as the old host/player because
+  // localStorage clientId is shared.
   if (key) {
     const byAccount = [...room.players.values()].find(p => String(p.accountKey || '').toLowerCase() === key);
     if (byAccount) return byAccount;
   }
+
+  const cleanedId = playerId ? cleanClientId(playerId) : '';
+  if (cleanedId && room.players.has(cleanedId)) {
+    const byId = room.players.get(cleanedId);
+    // Only trust raw clientId when the room player has no account, or when it belongs
+    // to the same account. Never let account B take account A's slot.
+    if (!key || !byId.accountKey || String(byId.accountKey || '').toLowerCase() === key) return byId;
+  }
+
   const nameKey = usernameKey(name || '');
   if (nameKey) {
-    const byName = [...room.players.values()].find(p => usernameKey(p.name || '') === nameKey);
+    const byName = [...room.players.values()].find(p => usernameKey(p.name || '') === nameKey && (!key || String(p.accountKey || '').toLowerCase() === key));
     if (byName) return byName;
   }
   return null;
@@ -1889,7 +1919,7 @@ io.on('connection', socket => {
     if (!profile) return cb?.({ ok: false, error: 'Login / daftar dulu sebelum membuat room.' });
     leaveCurrentRoom(socket, true);
     const code = makeCode();
-    const playerId = cleanClientId(clientId);
+    const playerId = accountKey || cleanClientId(clientId);
     const room = newRoom(code, playerId, profile.username, { roomName, password });
     const p = {
       id: playerId,
@@ -1932,7 +1962,7 @@ io.on('connection', socket => {
     if (!profile) return cb?.({ ok: false, error: 'Login / daftar dulu sebelum join room.' });
     const room = rooms.get(String(code || '').toUpperCase().trim());
     if (!room) return cb?.({ ok: false, error: 'Room tidak ditemukan.' });
-    const playerId = cleanClientId(clientId);
+    const playerId = accountKey || cleanClientId(clientId);
     const existing = findReconnectCandidate(room, playerId, accountKey, profile.username);
     if (existing) return reconnectPlayer(socket, room, existing, name, cb, 'join-reconnect');
     const invitedByFriend = room.invitedAccounts && room.invitedAccounts.has(accountKey);
