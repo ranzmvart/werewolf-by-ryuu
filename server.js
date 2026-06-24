@@ -508,6 +508,7 @@ function roomSummary(room) {
     code: room.code,
     name: room.name || 'Lobby Werewolf',
     phase: room.phase,
+    gameStarted: !!room.gameStarted,
     day: room.day || 0,
     playerCount: players.length,
     connectedCount: connected,
@@ -522,7 +523,7 @@ function roomSummary(room) {
 
 function getPublicRooms() {
   return [...rooms.values()]
-    .filter(room => room.phase === 'lobby' || room.phase === 'roleReveal' || room.phase === 'mayorVote')
+    .filter(room => room.phase === 'lobby' && !room.gameStarted)
     .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
     .slice(0, 50)
     .map(roomSummary);
@@ -609,6 +610,8 @@ function newRoom(code, hostPlayerId, hostName, options = {}) {
     maxPlayers: 16,
     hostId: hostPlayerId,
     phase: 'lobby',
+    gameStarted: false,
+    roundId: null,
     day: 0,
     timer: null,
     autoResetTimer: null,
@@ -673,6 +676,7 @@ function roomPublic(room) {
     hasPassword: !!room.passwordHash,
     maxPlayers: room.maxPlayers || 16,
     phase: room.phase,
+    gameStarted: !!room.gameStarted,
     day: room.day,
     settings: room.settings,
     phaseEndsAt: room.phaseEndsAt,
@@ -826,6 +830,8 @@ function startGame(room) {
     return;
   }
   clearRoomTimer(room);
+  room.gameStarted = true;
+  room.roundId = nowId();
   room.day = 0;
   room.logs = [];
   room.nightActions.clear();
@@ -871,6 +877,14 @@ function startGame(room) {
 function startMayorVote(room) {
   clearRoomTimer(room);
   if (!rooms.has(room.code) || room.phase === 'gameOver') return;
+  if (!room.gameStarted) {
+    room.phase = 'lobby';
+    room.mayorVotes.clear();
+    room.mayorResolved = false;
+    addLog(room, 'Vote Kades dibatalkan karena game belum dimulai.', 'warn');
+    sendState(room);
+    return;
+  }
   room.mayorVotes.clear();
   room.mayorResolved = false;
   narrative(room, 'Pemilihan Kepala Desa', 'Semua pemain hidup memilih Kades. Saat voting eliminasi, suara Kades bernilai 2.', 'amber');
@@ -885,6 +899,13 @@ function getMayorVoteState(room) {
 
 function resolveMayorVote(room) {
   if (!room || room.mayorResolved || room.phase !== 'mayorVote') return;
+  if (!room.gameStarted) {
+    room.phase = 'lobby';
+    room.mayorVotes.clear();
+    room.mayorResolved = false;
+    sendState(room);
+    return;
+  }
   room.mayorResolved = true;
   clearRoomTimer(room);
   const alive = alivePlayers(room);
@@ -1408,6 +1429,8 @@ function resetRoom(room, options = {}) {
   clearRoomTimer(room);
   clearAutoResetTimer(room);
   room.phase = 'lobby';
+  room.gameStarted = false;
+  room.roundId = null;
   room.day = 0;
   room.nightActions.clear();
   room.votes.clear();
@@ -2169,6 +2192,7 @@ function serializeRoom(room) {
     maxPlayers: room.maxPlayers || 16,
     hostId: room.hostId,
     phase: room.phase,
+    gameStarted: !!room.gameStarted,
     day: room.day || 0,
     phaseEndsAt: room.phaseEndsAt || null,
     autoResetAt: room.autoResetAt || null,
@@ -2197,6 +2221,9 @@ function hydrateRoom(raw) {
   room.maxPlayers = raw.maxPlayers || 16;
   room.hostId = raw.hostId;
   room.phase = raw.phase || 'lobby';
+  room.gameStarted = !!raw.gameStarted;
+  room.roundId = raw.roundId || null;
+  if (!room.gameStarted && room.phase !== 'lobby') room.phase = 'lobby';
   room.day = raw.day || 0;
   room.phaseEndsAt = raw.phaseEndsAt || null;
   room.autoResetAt = raw.autoResetAt || null;
@@ -2247,7 +2274,19 @@ function loadPersistedRooms() {
 }
 function resumeRoomTimers(room, fromBoot = false) {
   clearRoomTimer(room);
+  if (!room.gameStarted && room.phase !== 'gameOver') {
+    room.phase = 'lobby';
+    room.mayorVotes?.clear?.();
+    room.mayorResolved = false;
+  }
   if (room.phase === 'lobby') { sendState(room); return; }
+  if (!room.gameStarted || ![...room.players.values()].some(p => p.role)) {
+    room.phase = 'lobby';
+    room.gameStarted = false;
+    room.roundId = null;
+    sendState(room);
+    return;
+  }
   const now = Date.now();
   const graceMs = 20000;
   if (room.phase === 'gameOver') {

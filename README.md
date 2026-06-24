@@ -1,35 +1,25 @@
-# Werewolf by Ryuu v3.9 - Game UI, Reconnect, Asset Fix
+# Werewolf by Ryuu v4.1 - Reconnect/Kades/Assets Fix
 
-Versi ini memperbaiki tampilan saat bermain di HP/laptop, bug reconnect saat vote Kepala Desa, dan fallback asset agar gambar yang gagal load tidak menampilkan teks kosong seperti scene/image.
+Patch ini memperbaiki:
 
-## Fix utama
+- Bug room baru tiba-tiba masuk fase Kepala Desa sebelum host klik Start.
+- Auto reconnect yang terlalu agresif dan menyebabkan loop reconnect.
+- Pemulihan auth/socket setelah reconnect tanpa memaksa reconnect saat baru join room.
+- Room list hanya menampilkan room lobby yang benar-benar belum mulai.
+- Guard server: fase Kades/role reveal tidak bisa berjalan kalau game belum dimulai.
+- Path asset TCG yang salah diperbaiki agar tidak muncul teks scene/image atau gambar kosong.
+- Layout game room dari v3.9 tetap dipertahankan.
 
-- Layout game room HP dibuat tab: Aksi, Role, Pemain, Chat, Log.
-- Layout laptop tetap 3 panel rapi dan proporsional.
-- Vote Kepala Desa dikunci setelah memilih dan auto resolve jika semua pemain sudah vote.
-- Reconnect diberi guard/cooldown agar tidak spam reconnect berulang.
-- Mayor vote tidak diulang karena resolve ganda.
-- Asset gambar punya fallback otomatis kalau gagal load.
-- Alt text gambar scene tidak lagi muncul sebagai teks jika asset gagal.
-- Semua fitur lama tetap dipertahankan.
+Upload isi folder ini ke root repo GitHub, lalu Railway redeploy.
 
-## Deploy Railway
+Struktur:
 
-Upload isi folder ini ke root repo GitHub:
-
-```text
+```
 public/
+server.js
 package.json
 railway.json
 Dockerfile
 README.md
-server.js
+ASSET_CREDITS.md
 ```
-
-Pastikan Railway memakai Node 22 dan Volume tetap mount ke `/app/data` agar data akun/room tetap tersimpan.
-
-
-## v4.0 Auth Room Fix
-- Memperbaiki bug setelah login tetapi create/join room dianggap belum login.
-- Auth session sekarang otomatis dipulihkan saat Socket.IO reconnect atau Railway restart.
-- Create, join, dan reconnect room membawa auth aman dari browser agar tidak gagal.

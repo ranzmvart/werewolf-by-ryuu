@@ -76,7 +76,7 @@ const TCG_EFFECT_ASSETS = {
   "Double Vision": "/assets/tcg/effects/effect-double-vision.svg",
   "Blood Moon": "/assets/tcg/effects/effect-blood-moon.svg"
 };
-function roleAsset(role) { return TCG_ROLE_ASSETS[role] || '/assets/tcg/templates/rare.svg'; }
+function roleAsset(role) { return TCG_ROLE_ASSETS[role] || '/assets/tcg/templates/template-rare.svg'; }
 function effectAsset(name, fallback = '/assets/tcg/effects/effect-victory-nova.svg') { return TCG_EFFECT_ASSETS[name] || fallback; }
 
 let roomState = null;
@@ -87,6 +87,9 @@ let selectedActionType = 'heal';
 let reconnectInFlight = false;
 let lastReconnectAttemptAt = 0;
 let lastAutoReconnectAt = 0;
+let hadSocketDisconnect = false;
+let allowAutoReconnectOnce = false;
+let currentRoomCode = null;
 let activeGameTab = localStorage.getItem('ryuuGameTab') || 'actions';
 let mayorVoteLockedTarget = null;
 let localStream = null;
@@ -272,12 +275,13 @@ function getSession() {
 
 function saveSession(code, playerId) {
   if (!code || !playerId) return;
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ code, playerId, clientId, savedAt: Date.now() }));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ code, playerId, clientId, account: accountProfile?.username || savedAuth()?.username || null, savedAt: Date.now() }));
   renderResumeBox();
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+  currentRoomCode = null;
   renderResumeBox();
 }
 
@@ -295,6 +299,9 @@ function reconnectFromSavedSession(showError = true, reason = 'manual') {
     return;
   }
   const now = Date.now();
+  if (!showError && reason !== 'socket-reconnect' && reason !== 'auto-login-after-disconnect') return;
+  if (!showError && currentRoomCode && session.code !== currentRoomCode) return;
+  if (!showError && !hadSocketDisconnect && !allowAutoReconnectOnce) return;
   if (reconnectInFlight) return;
   if (!showError && now - lastAutoReconnectAt < 4500) return;
   if (now - lastReconnectAttemptAt < 900) return;
@@ -313,6 +320,9 @@ function reconnectFromSavedSession(showError = true, reason = 'manual') {
       return;
     }
     saveSession(res.code, res.playerId);
+    currentRoomCode = res.code;
+    hadSocketDisconnect = false;
+    allowAutoReconnectOnce = false;
     enterGame();
     if (showError) toast('Reconnect berhasil', `Kamu kembali ke room ${res.code}.`);
     softHideLoader(showError ? 550 : 120);
@@ -472,14 +482,15 @@ socket.on('connect', () => {
   setConnectionStatus('online', 'Online');
   autoLoginAccount(true);
   requestRoomList(false);
-  // Jika halaman masih di arena dan koneksi sempat putus, masuk ulang otomatis.
-  if (!els.game.classList.contains('hidden') && getSession()?.code) {
-    setTimeout(() => reconnectFromSavedSession(false, 'socket-connect'), accountProfile ? 350 : 900);
+  // Auto reconnect hanya setelah socket benar-benar disconnect, bukan saat baru join room.
+  if (hadSocketDisconnect && !els.game.classList.contains('hidden') && getSession()?.code) {
+    allowAutoReconnectOnce = true;
+    setTimeout(() => reconnectFromSavedSession(false, 'socket-reconnect'), accountProfile ? 450 : 1000);
   }
 });
 
 socket.io.on('reconnect_attempt', () => setConnectionStatus('reconnecting', 'Reconnecting...'));
-socket.on('disconnect', () => setConnectionStatus('offline', 'Offline'));
+socket.on('disconnect', () => { hadSocketDisconnect = true; setConnectionStatus('offline', 'Offline'); });
 socket.on('connect_error', () => setConnectionStatus('offline', 'Koneksi gagal'));
 
 socket.on('rooms:list', (rooms) => {
@@ -523,6 +534,7 @@ socket.on('reward:summary', ({ points, won, profile } = {}) => {
 socket.on('room:state', (state) => {
   const prevPhase = roomState?.phase;
   roomState = state;
+  if (state?.code) currentRoomCode = state.code;
   if (state?.phase !== 'mayorVote') mayorVoteLockedTarget = null;
   if (prevPhase !== state?.phase && ['mayorVote','night','voting','hunter'].includes(state?.phase)) setGameTab('actions', true);
   if (state?.code && me?.id) saveSession(state.code, me.id);
@@ -769,7 +781,7 @@ function isWolf(role) { return role === 'Werewolf' || role === 'Alpha Werewolf';
 
 function showCinematic(a) {
   const map = {
-    roleReveal: '/assets/tcg/templates/epic.svg', mayor: effectAsset('Mayor Crown'), nightRole: effectAsset('Blood Moon'), attack: effectAsset('Werewolf Maul'), death: effectAsset('Death Smoke'), saved: effectAsset('Guard Wall'), seer: effectAsset('Seer Vision'), heal: effectAsset('Doctor Pulse'), guard: effectAsset('Guard Wall'), poison: effectAsset('Witch Poison'), vote: effectAsset('Mayor Crown'), execution: effectAsset('Death Smoke'), hunter: effectAsset('Hunter Shot'), hunterShot: effectAsset('Hunter Shot'), victory: effectAsset('Victory Nova'), defeat: effectAsset('Death Smoke'), wolfWin: effectAsset('Alpha Rend'), villageWin: effectAsset('Victory Nova'), jesterWin: '/assets/tcg/roles/role-jester.svg', blocked: effectAsset('Guard Wall'), cursed: effectAsset('Blood Moon'), prince: effectAsset('Mayor Crown'), bless: effectAsset('Guard Wall'), powerItem: effectAsset('Double Vision'), crate: '/assets/tcg/templates/legendary.svg'
+    roleReveal: '/assets/tcg/templates/template-epic.svg', mayor: effectAsset('Mayor Crown'), nightRole: effectAsset('Blood Moon'), attack: effectAsset('Werewolf Maul'), death: effectAsset('Death Smoke'), saved: effectAsset('Guard Wall'), seer: effectAsset('Seer Vision'), heal: effectAsset('Doctor Pulse'), guard: effectAsset('Guard Wall'), poison: effectAsset('Witch Poison'), vote: effectAsset('Mayor Crown'), execution: effectAsset('Death Smoke'), hunter: effectAsset('Hunter Shot'), hunterShot: effectAsset('Hunter Shot'), victory: effectAsset('Victory Nova'), defeat: effectAsset('Death Smoke'), wolfWin: effectAsset('Alpha Rend'), villageWin: effectAsset('Victory Nova'), jesterWin: '/assets/tcg/roles/role-jester.svg', blocked: effectAsset('Guard Wall'), cursed: effectAsset('Blood Moon'), prince: effectAsset('Mayor Crown'), bless: effectAsset('Guard Wall'), powerItem: effectAsset('Double Vision'), crate: '/assets/tcg/templates/template-legendary.svg'
   };
   const actorAsset = map[a.type] || '/assets/wolf-attack.svg';
   const targetAsset = a.type === 'attack' ? '/assets/rarity-mythic.svg' : a.type === 'seer' ? '/assets/seer-orb.svg' : a.type === 'heal' ? '/assets/doctor-drone.svg' : a.type === 'death' ? '/assets/rarity-common.svg' : '/assets/rarity-legendary.svg';
@@ -872,8 +884,9 @@ function autoLoginAccount(force = false) {
       latestLeaderboards = res.leaderboards || latestLeaderboards;
       els.nameInput.value = accountProfile.username;
       renderAccountHub();
-      if (!els.game.classList.contains('hidden') && getSession()?.code) {
-        setTimeout(() => reconnectFromSavedSession(false, 'auto-login'), 350);
+      if (hadSocketDisconnect && !els.game.classList.contains('hidden') && getSession()?.code) {
+        allowAutoReconnectOnce = true;
+        setTimeout(() => reconnectFromSavedSession(false, 'auto-login-after-disconnect'), 350);
       }
     } else {
       if (!accountProfile) renderAccountHub();

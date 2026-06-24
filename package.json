@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "3.9.0",
-  "description": "Werewolf by Ryuu - Game UI Reconnect Assets Fix Final",
+  "version": "4.1.0",
+  "description": "Werewolf by Ryuu v4.1 reconnect kades and asset fix",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
