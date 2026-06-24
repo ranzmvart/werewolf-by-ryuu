@@ -110,7 +110,7 @@ const els = {
   narrative: $('narrative'), actionPanel: $('actionPanel'), actionHint: $('actionHint'), targetGrid: $('targetGrid'), players: $('players'), playerCount: $('playerCount'), gameLogs: $('gameLogs'),
   chatLog: $('chatLog'), chatForm: $('chatForm'), chatInput: $('chatInput'), chatChannel: $('chatChannel'),
   cinematic: $('cinematic'), cinematicIcon: $('cinematicIcon'), cinematicTitle: $('cinematicTitle'), cinematicText: $('cinematicText'), toastStack: $('toastStack'),
-  joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
+  joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), voiceMembers: $('voiceMembers'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
   guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
   appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), cratePanel: $('cratePanel'), friendsPanel: $('friendsPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), crateTabBtn: $('crateTabBtn'), friendsTabBtn: $('friendsTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose'),
@@ -613,6 +613,7 @@ function renderAll() {
   renderTimer();
   renderRole();
   renderPlayers();
+  renderVoiceMembers();
   renderActions();
   renderLogs();
   renderGameProfileBox();
@@ -684,6 +685,26 @@ function renderPlayers() {
 }
 
 window.kickPlayer = (id) => socket.emit('game:kick', { playerId: id });
+
+function renderVoiceMembers() {
+  if (!els.voiceMembers) return;
+  const players = roomState?.players || [];
+  const voiced = players.filter(p => p.voice && p.connected);
+  if (!voiced.length) {
+    els.voiceMembers.className = 'voice-members empty';
+    els.voiceMembers.textContent = 'Belum ada yang join voice';
+    return;
+  }
+  els.voiceMembers.className = 'voice-members';
+  els.voiceMembers.innerHTML = voiced.map(p => {
+    const initial = (p.name || '?').slice(0,1).toUpperCase();
+    const avatar = p.avatar
+      ? `<img src="${escapeHtml(p.avatar)}" alt="${escapeHtml(p.name)}" onerror="this.replaceWith(document.createTextNode('${escapeHtml(initial)}'))">`
+      : `<span>${escapeHtml(initial)}</span>`;
+    const self = p.id === me?.id ? '<small>Kamu</small>' : '';
+    return `<div class="voice-member ${p.id === me?.id ? 'self' : ''}"><div class="voice-avatar">${avatar}</div><b>${escapeHtml(p.name)}</b>${self}<i></i></div>`;
+  }).join('');
+}
 
 function renderActions() {
   els.targetGrid.innerHTML = '';
@@ -1312,6 +1333,7 @@ els.joinVoice.onclick = async () => {
     els.muteVoice.disabled = false;
     els.leaveVoice.disabled = false;
     els.voiceStatus.textContent = 'Voice aktif. Microphone menyala.';
+    renderVoiceMembers();
     toast('Voice aktif', 'Kamu sudah masuk voice room.');
   } catch (e) {
     toast('Voice gagal', 'Browser menolak mikrofon. Pastikan buka dari HTTPS dan izin microphone diaktifkan.');
@@ -1340,6 +1362,7 @@ function leaveVoice() {
   els.leaveVoice.disabled = true;
   els.muteVoice.textContent = 'Mute';
   els.voiceStatus.textContent = 'Belum join voice';
+  renderVoiceMembers();
 }
 
 socket.on('voice:peers', async ({ peers: ids }) => {
@@ -1347,9 +1370,13 @@ socket.on('voice:peers', async ({ peers: ids }) => {
 });
 socket.on('voice:peer-joined', async ({ peerId, name }) => {
   toast('Voice', `${name || 'Pemain'} masuk voice.`);
+  renderVoiceMembers();
   await createPeer(peerId, false);
 });
-socket.on('voice:peer-left', ({ peerId }) => removePeer(peerId));
+socket.on('voice:peer-left', ({ peerId }) => {
+  removePeer(peerId);
+  renderVoiceMembers();
+});
 socket.on('voice:signal', async ({ from, signal }) => {
   let pc = peers.get(from);
   if (!pc) pc = await createPeer(from, false);

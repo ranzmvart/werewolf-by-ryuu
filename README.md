@@ -10,3 +10,10 @@ Yang berubah:
 - Room aktif yang sedang berjalan tetap disimpan di data/rooms.json agar reconnect/recover Railway tetap aman.
 
 Upload isi folder ini ke repo GitHub, bukan ZIP-nya langsung.
+
+
+## v4.6 Voice Participants Patch
+
+- Menambahkan daftar pemain yang sedang berada di voice room.
+- Daftar voice muncul di kotak Voice Room dengan avatar/nama dan indikator online.
+- Tidak mengubah gameplay, role, room cleanup, reset, musik, atau sistem lain.
