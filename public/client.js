@@ -114,6 +114,106 @@ if (savedName) els.nameInput.value = savedName;
 const savedRoomName = localStorage.getItem('werewolfRoomName');
 if (savedRoomName && els.roomNameInput) els.roomNameInput.value = savedRoomName;
 
+
+// === v3.7 Real Pages Router: membuat menu HP/laptop tidak menumpuk ===
+let activeMenuRoute = 'home';
+function initMenuRouter() {
+  const hero = document.querySelector('.hero-card');
+  if (!hero || document.getElementById('menuRouter')) return;
+
+  const subtitle = hero.querySelector('.subtitle');
+  const formGrid = hero.querySelector('.form-grid');
+  const roomBrowser = hero.querySelector('.room-browser');
+  const roomNote = roomBrowser?.nextElementSibling?.classList?.contains('mini-note') ? roomBrowser.nextElementSibling : null;
+  const resumeBox = els.resumeBox;
+
+  const router = document.createElement('div');
+  router.id = 'menuRouter';
+  router.className = 'menu-router';
+  router.innerHTML = `
+    <nav class="menu-page-nav" aria-label="Navigasi Menu">
+      <button class="menu-nav-btn active" data-menu-route="home" type="button">Home</button>
+      <button class="menu-nav-btn" data-menu-route="account" type="button">Akun</button>
+      <button class="menu-nav-btn" data-menu-route="create" type="button">Buat Room</button>
+      <button class="menu-nav-btn" data-menu-route="lobby" type="button">Lobby</button>
+      <button class="menu-nav-btn" data-account-tab="shop" type="button">Shop</button>
+      <button class="menu-nav-btn" data-account-tab="inv" type="button">Inventory</button>
+      <button class="menu-nav-btn" data-account-tab="crates" type="button">Crates</button>
+      <button class="menu-nav-btn" data-account-tab="friends" type="button">Friends</button>
+      <button class="menu-nav-btn" data-account-tab="lb" type="button">Rank</button>
+    </nav>
+    <div id="menuRouteHome" class="menu-route-page active">
+      <div class="menu-home-card glass-lite">
+        <div id="menuAccountMini" class="menu-account-mini"></div>
+        <div class="home-choice-grid">
+          <button class="home-choice primary-choice" data-menu-route="create" type="button"><b>Buat Room</b><span>Host lobby baru, password opsional.</span></button>
+          <button class="home-choice" data-menu-route="lobby" type="button"><b>Join Lobby</b><span>Lihat daftar room publik dan masuk cepat.</span></button>
+          <button class="home-choice" data-account-tab="shop" type="button"><b>Shop</b><span>Beli skin, power, badge, dan frame.</span></button>
+          <button class="home-choice" data-account-tab="crates" type="button"><b>Open Crate</b><span>Gacha item Common sampai Mythic.</span></button>
+          <button class="home-choice" data-account-tab="friends" type="button"><b>Friends</b><span>Tambah teman dan invite ke lobby.</span></button>
+          <button class="home-choice" data-account-tab="lb" type="button"><b>Leaderboard</b><span>Top 100 statistik pemain.</span></button>
+        </div>
+      </div>
+    </div>
+    <div id="menuRouteAccount" class="menu-route-page menu-route-account hidden">
+      <div class="route-page-head"><button class="back-home-btn" data-menu-route="home" type="button">← Home</button><div><b>Akun Pemain</b><span>Login, daftar, dan ringkasan profil.</span></div></div>
+    </div>
+    <div id="menuRouteCreate" class="menu-route-page hidden">
+      <div class="route-page-head"><button class="back-home-btn" data-menu-route="home" type="button">← Home</button><div><b>Buat / Join Manual</b><span>Isi data room di halaman khusus ini saja.</span></div></div>
+    </div>
+    <div id="menuRouteLobby" class="menu-route-page hidden">
+      <div class="route-page-head"><button class="back-home-btn" data-menu-route="home" type="button">← Home</button><div><b>Lobby Publik</b><span>Pilih room yang sedang terbuka.</span></div></div>
+    </div>
+  `;
+
+  if (subtitle) subtitle.insertAdjacentElement('afterend', router);
+  else hero.appendChild(router);
+
+  const accountPage = document.getElementById('menuRouteAccount');
+  const createPage = document.getElementById('menuRouteCreate');
+  const lobbyPage = document.getElementById('menuRouteLobby');
+  if (els.accountHub) accountPage.appendChild(els.accountHub);
+  if (formGrid) createPage.appendChild(formGrid);
+  if (resumeBox) createPage.appendChild(resumeBox);
+  if (roomBrowser) lobbyPage.appendChild(roomBrowser);
+  if (roomNote) lobbyPage.appendChild(roomNote);
+
+  router.querySelectorAll('[data-menu-route]').forEach(btn => {
+    btn.addEventListener('click', () => showMenuRoute(btn.dataset.menuRoute));
+  });
+  router.querySelectorAll('[data-account-tab]').forEach(btn => {
+    btn.addEventListener('click', () => openAccountPage(btn.dataset.accountTab));
+  });
+  showMenuRoute(localStorage.getItem('ryuuMenuRouteV37') || 'home');
+}
+function showMenuRoute(route = 'home') {
+  activeMenuRoute = route;
+  localStorage.setItem('ryuuMenuRouteV37', route);
+  els.accountPage?.classList.add('hidden');
+  els.game?.classList.add('hidden');
+  els.login?.classList.remove('hidden');
+  document.querySelectorAll('.menu-route-page').forEach(page => page.classList.add('hidden'));
+  const page = document.getElementById('menuRoute' + route.charAt(0).toUpperCase() + route.slice(1));
+  (page || document.getElementById('menuRouteHome'))?.classList.remove('hidden');
+  document.querySelectorAll('.menu-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.menuRoute === route));
+  updateMenuAccountMini();
+  if (route === 'lobby') socket.emit('rooms:list');
+  if (route === 'create') renderResumeBox();
+}
+function updateMenuAccountMini() {
+  const box = document.getElementById('menuAccountMini');
+  if (!box) return;
+  if (!accountProfile) {
+    box.innerHTML = `<div><b>Belum login</b><span>Login/daftar dulu agar poin, inventory, dan statistik tersimpan.</span></div><button class="btn primary small" data-menu-route="account" type="button">Login / Daftar</button>`;
+  } else {
+    const s = accountProfile.stats || {};
+    const eq = accountProfile.equipped || {};
+    box.innerHTML = `<img class="profile-avatar ${escapeHtml(frameClass(eq.frame))}" src="${escapeHtml(accountProfile.avatar)}" alt="avatar"><div><b>${escapeHtml(accountProfile.username)} ${accountProfile.isAdmin ? '<span class="owner-chip">OWNER</span>' : ''}</b><span>${escapeHtml(pointsText(accountProfile))} poin • ${s.wins || 0} win • ${s.games || 0} main</span></div><button class="btn secondary small" data-menu-route="account" type="button">Profil</button>`;
+  }
+  box.querySelectorAll('[data-menu-route]').forEach(btn => btn.addEventListener('click', () => showMenuRoute(btn.dataset.menuRoute)));
+}
+initMenuRouter();
+
 let loadingHideTimer = null;
 function setUiLoading(show = true, text = 'Memuat Ryuu Village...') {
   if (!els.appLoader) return;
@@ -302,6 +402,7 @@ window.joinListedRoom = (code, hasPassword) => {
 };
 
 function enterGame() {
+  els.accountPage?.classList.add('hidden');
   els.login.classList.add('hidden');
   els.game.classList.remove('hidden');
   softHideLoader(650);
@@ -309,10 +410,12 @@ function enterGame() {
 
 function showMenuOnly() {
   softHideLoader(100);
+  els.accountPage?.classList.add('hidden');
   els.game.classList.add('hidden');
   els.login.classList.remove('hidden');
+  showMenuRoute('home');
   renderResumeBox();
-  toast('Menu awal', 'Session room masih tersimpan. Tekan Reconnect untuk kembali.');
+  toast('Menu awal', 'Session room masih tersimpan. Buka halaman Buat Room lalu tekan Reconnect untuk kembali.');
 }
 
 els.menuBtn?.addEventListener('click', showMenuOnly);
@@ -815,16 +918,29 @@ function renderAccountHub() {
     els.profileSummary?.classList.add('hidden');
   }
   renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderCrates(); renderFriends(); renderGameProfileBox();
+  updateMenuAccountMini();
   if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
 }
 
 function openAccountPage(tab = 'profile') {
-  if (!accountProfile && tab !== 'profile') return toast('Login dulu', 'Daftar atau login untuk membuka halaman ini.');
+  if (!accountProfile && tab !== 'profile') {
+    showMenuRoute('account');
+    return toast('Login dulu', 'Daftar atau login untuk membuka halaman ini.');
+  }
   activeHubTab = tab;
   refreshAccountPage();
+  els.game?.classList.add('hidden');
+  els.login?.classList.add('hidden');
   els.accountPage?.classList.remove('hidden');
+  if (els.accountPageClose) els.accountPageClose.textContent = '←';
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
-function closeAccountPage() { els.accountPage?.classList.add('hidden'); }
+function closeAccountPage() {
+  els.accountPage?.classList.add('hidden');
+  els.game?.classList.add('hidden');
+  els.login?.classList.remove('hidden');
+  showMenuRoute('home');
+}
 function refreshAccountPage() {
   const titles = {
     profile: ['Profil Pemain', 'Statistik, foto profil, badge, frame, dan equip aktif.'],

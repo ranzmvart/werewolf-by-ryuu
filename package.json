@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "3.4.0",
-  "description": "Werewolf by Ryuu - Crates, Friends, Invite Lobby, Persistent Rooms, Shop, Voice, Shared Music",
+  "version": "3.7.0",
+  "description": "Werewolf by Ryuu - Real Pages Clean UI Final",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

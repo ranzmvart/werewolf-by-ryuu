@@ -81,3 +81,10 @@ Update ini fokus ke tampilan agar lebih rapi di laptop dan HP tanpa mengubah fit
 - Input dibuat ukuran aman agar HP tidak zoom otomatis.
 - Panel game, topbar, dan music player dibuat lebih minimalis.
 - Semua fitur lama tetap dipertahankan.
+
+
+## v3.7 Real Pages Clean Update
+- Menu HP/laptop dipisah menjadi halaman internal: Home, Akun, Buat Room, Lobby, Shop, Inventory, Crates, Friends, dan Leaderboard.
+- Tombol di menu utama sekarang berupa pilihan singkat agar tidak memanjang ke bawah.
+- Shop/Inventory/Crate/Leaderboard/Friends dibuka sebagai halaman penuh, bukan popup di atas halaman.
+- Semua gameplay dan fitur lama tetap dipertahankan.
