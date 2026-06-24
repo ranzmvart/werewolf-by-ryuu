@@ -46,3 +46,26 @@ File yang disimpan permanen:
 Username: ryuu
 PIN: 291206
 ```
+
+
+## v3.5 TCG Role/Skin Asset Update
+
+Versi ini menambahkan asset visual TCG-style untuk role, skin, dan effect skill:
+
+- Role cards: Werewolf, Alpha Werewolf, Villager, Seer, Doctor, Hunter, Bodyguard, Witch, Medium, Jester, Cursed Villager, Prince, Priest, Lycan, Sorcerer, Tough Guy.
+- Skin cards: Nocturne Wolf, Blood Moon Alpha, Silver Fang, Village Guardian, Royal Villager, Astral Seer, Neon Medic, Void Witch, Raven Hunter, dan lainnya.
+- Effect cards: Werewolf Maul, Seer Vision, Doctor Pulse, Guard Wall, Witch Poison, Hunter Shot, Mayor Crown, Blood Moon, Double Vision, Death Smoke, Victory Nova.
+
+Asset ada di:
+
+```text
+public/assets/tcg/
+```
+
+Manifest asset ada di:
+
+```text
+public/assets/tcg/asset-manifest.json
+```
+
+Role card di UI sudah diganti dari emoji menjadi kartu visual TCG-style.

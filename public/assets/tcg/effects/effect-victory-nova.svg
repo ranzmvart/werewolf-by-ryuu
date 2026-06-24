@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Victory Nova">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#083344"/><stop offset=".55" stop-color="#155e75"/><stop offset="1" stop-color="#020617"/></linearGradient>
+  <radialGradient id="shine" cx="35%" cy="18%" r="70%"><stop offset="0" stop-color="white" stop-opacity=".55"/><stop offset=".45" stop-color="#22d3ee" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".22" stop-color="#22d3ee" stop-opacity=".85"/><stop offset=".5" stop-color="#111827"/><stop offset=".82" stop-color="#22d3ee" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity=".65"/></linearGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="24" stdDeviation="18" flood-color="#000" flood-opacity=".55"/></filter>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="noise" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M0 44L44 0M-11 11L11-11M33 55L55 33" stroke="#fff" stroke-opacity=".04" stroke-width="2"/></pattern>
+</defs>
+<rect width="800" height="800" rx="120" fill="#020617"/>
+<rect x="40" y="40" width="720" height="720" rx="95" fill="url(#bg)" stroke="url(#metal)" stroke-width="18"/>
+<rect x="82" y="82" width="636" height="636" rx="70" fill="url(#shine)"/>
+<circle cx="400" cy="390" r="220" fill="#22d3ee" opacity=".38" filter="url(#glow)"/><path d="M400 120 L465 320 L680 320 L505 445 L570 660 L400 535 L230 660 L295 445 L120 320 L335 320Z" fill="#fff" opacity=".76"/>
+<text x="400" y="742" font-family="Inter,Arial,sans-serif" font-weight="900" font-size="42" text-anchor="middle" fill="#f8fafc">Victory Nova</text>
+</svg>

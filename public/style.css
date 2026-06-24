@@ -875,3 +875,14 @@ body {
 @media (max-width:720px){.crate-opening-shell{padding:16px;border-radius:24px}.crate-case-3d{height:118px}.crate-case-3d img{width:104px;height:104px}.case-spinner{height:134px}.case-item{flex-basis:96px;height:106px;border-radius:16px}.case-item img{width:50px;height:50px}.case-rail{gap:10px}.crate-stage-head{align-items:flex-start}.crate-price-pill{font-size:12px}.cinematic-3d-scene{height:150px}.scene-actor,.scene-target{width:86px;height:86px}.scene-actor{left:9%;top:42px}.scene-target{right:9%;top:48px}}
 .game-asset-item .shop-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-start;gap:12px}.item-asset{width:58px;height:58px;border-radius:16px;object-fit:contain;background:linear-gradient(180deg,rgba(15,23,42,.88),rgba(2,6,23,.75));padding:7px;box-shadow:0 16px 28px rgba(0,0,0,.32),inset 0 1px rgba(255,255,255,.09);filter:drop-shadow(0 12px 8px rgba(0,0,0,.3))}.game-asset-item.rarity-rare .item-asset{box-shadow:0 0 24px rgba(56,189,248,.2)}.game-asset-item.rarity-epic .item-asset{box-shadow:0 0 28px rgba(168,85,247,.25)}.game-asset-item.rarity-legendary .item-asset{box-shadow:0 0 34px rgba(245,158,11,.28)}.game-asset-item.rarity-mythic .item-asset{box-shadow:0 0 40px rgba(251,113,133,.32)}
 @media(max-width:680px){.game-asset-item .shop-top{grid-template-columns:auto 1fr}.game-asset-item .shop-top .badge{grid-column:1/-1;width:max-content}.item-asset{width:50px;height:50px}}
+
+/* v3.5 TCG ROLE + SKIN ASSETS */
+.role-card-tcg { padding: 12px; display: grid; gap: 10px; align-items: start; background: radial-gradient(circle at 20% 5%, rgba(255,255,255,.16), transparent 32%), linear-gradient(135deg, rgba(15,23,42,.9), rgba(30,41,59,.66)); }
+.role-card-art-wrap { position: relative; border-radius: 18px; overflow: hidden; min-height: 245px; display: grid; place-items: center; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.12); }
+.role-card-art { width: min(100%, 210px); max-height: 285px; object-fit: contain; filter: drop-shadow(0 24px 28px rgba(0,0,0,.42)); transform: perspective(900px) rotateX(2deg) rotateY(-3deg); animation: tcgIdle 4.8s ease-in-out infinite; }
+.role-card-tcg .role-name { margin: 0; font-size: 20px; }
+.role-card-tcg .role-desc { font-size: 12px; }
+@keyframes tcgIdle { 0%,100%{ transform: perspective(900px) rotateX(2deg) rotateY(-3deg) translateY(0);} 50%{ transform: perspective(900px) rotateX(0deg) rotateY(4deg) translateY(-7px);} }
+.cinematic-card .cinematic-main-asset { border-radius: 28px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); padding: 8px; }
+.tcg-asset-note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 680px) { .role-card-art-wrap { min-height: 200px; } .role-card-art { max-height: 230px; width: min(100%, 180px); } }

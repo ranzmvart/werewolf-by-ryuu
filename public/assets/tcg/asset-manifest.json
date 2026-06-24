@@ -1,0 +1,61 @@
+{
+  "roles": {
+    "Alpha Werewolf": "/assets/tcg/roles/role-alpha-werewolf.svg",
+    "Werewolf": "/assets/tcg/roles/role-werewolf.svg",
+    "Villager": "/assets/tcg/roles/role-villager.svg",
+    "Seer": "/assets/tcg/roles/role-seer.svg",
+    "Doctor": "/assets/tcg/roles/role-doctor.svg",
+    "Hunter": "/assets/tcg/roles/role-hunter.svg",
+    "Bodyguard": "/assets/tcg/roles/role-bodyguard.svg",
+    "Witch": "/assets/tcg/roles/role-witch.svg",
+    "Medium": "/assets/tcg/roles/role-medium.svg",
+    "Jester": "/assets/tcg/roles/role-jester.svg",
+    "Cursed Villager": "/assets/tcg/roles/role-cursed-villager.svg",
+    "Prince": "/assets/tcg/roles/role-prince.svg",
+    "Priest": "/assets/tcg/roles/role-priest.svg",
+    "Lycan": "/assets/tcg/roles/role-lycan.svg",
+    "Sorcerer": "/assets/tcg/roles/role-sorcerer.svg",
+    "Tough Guy": "/assets/tcg/roles/role-tough-guy.svg"
+  },
+  "skins": {
+    "Nocturne Wolf": "/assets/tcg/skins/skin-nocturne-wolf.svg",
+    "Blood Moon Alpha": "/assets/tcg/skins/skin-blood-moon-alpha.svg",
+    "Silver Fang": "/assets/tcg/skins/skin-silver-fang.svg",
+    "Village Guardian": "/assets/tcg/skins/skin-village-guardian.svg",
+    "Royal Villager": "/assets/tcg/skins/skin-royal-villager.svg",
+    "Lantern Keeper": "/assets/tcg/skins/skin-lantern-keeper.svg",
+    "Astral Seer": "/assets/tcg/skins/skin-astral-seer.svg",
+    "Crystal Oracle": "/assets/tcg/skins/skin-crystal-oracle.svg",
+    "Neon Medic": "/assets/tcg/skins/skin-neon-medic.svg",
+    "Emerald Healer": "/assets/tcg/skins/skin-emerald-healer.svg",
+    "Iron Bodyguard": "/assets/tcg/skins/skin-iron-bodyguard.svg",
+    "Void Witch": "/assets/tcg/skins/skin-void-witch.svg",
+    "Potion Witch": "/assets/tcg/skins/skin-potion-witch.svg",
+    "Raven Hunter": "/assets/tcg/skins/skin-raven-hunter.svg",
+    "Ghost Medium": "/assets/tcg/skins/skin-ghost-medium.svg",
+    "Golden Prince": "/assets/tcg/skins/skin-golden-prince.svg",
+    "Chaos Jester": "/assets/tcg/skins/skin-chaos-jester.svg",
+    "Holy Priest": "/assets/tcg/skins/skin-holy-priest.svg"
+  },
+  "effects": {
+    "Werewolf Maul": "/assets/tcg/effects/effect-werewolf-maul.svg",
+    "Alpha Rend": "/assets/tcg/effects/effect-alpha-rend.svg",
+    "Seer Vision": "/assets/tcg/effects/effect-seer-vision.svg",
+    "Doctor Pulse": "/assets/tcg/effects/effect-doctor-pulse.svg",
+    "Guard Wall": "/assets/tcg/effects/effect-guard-wall.svg",
+    "Witch Poison": "/assets/tcg/effects/effect-witch-poison.svg",
+    "Hunter Shot": "/assets/tcg/effects/effect-hunter-shot.svg",
+    "Mayor Crown": "/assets/tcg/effects/effect-mayor-crown.svg",
+    "Death Smoke": "/assets/tcg/effects/effect-death-smoke.svg",
+    "Victory Nova": "/assets/tcg/effects/effect-victory-nova.svg",
+    "Double Vision": "/assets/tcg/effects/effect-double-vision.svg",
+    "Blood Moon": "/assets/tcg/effects/effect-blood-moon.svg"
+  },
+  "templates": {
+    "common": "/assets/tcg/templates/template-common.svg",
+    "rare": "/assets/tcg/templates/template-rare.svg",
+    "epic": "/assets/tcg/templates/template-epic.svg",
+    "legendary": "/assets/tcg/templates/template-legendary.svg",
+    "mythic": "/assets/tcg/templates/template-mythic.svg"
+  }
+}

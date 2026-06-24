@@ -23,6 +23,62 @@ const ROLE_META = {
   'Tough Guy': { team:'village', emoji:'💪', aura:'amber', desc:'Warga kuat tanpa aksi aktif. Cocok untuk bluffing dan tahan tekanan.' }
 };
 
+
+const TCG_ROLE_ASSETS = {
+  "Alpha Werewolf": "/assets/tcg/roles/role-alpha-werewolf.svg",
+  "Werewolf": "/assets/tcg/roles/role-werewolf.svg",
+  "Villager": "/assets/tcg/roles/role-villager.svg",
+  "Seer": "/assets/tcg/roles/role-seer.svg",
+  "Doctor": "/assets/tcg/roles/role-doctor.svg",
+  "Hunter": "/assets/tcg/roles/role-hunter.svg",
+  "Bodyguard": "/assets/tcg/roles/role-bodyguard.svg",
+  "Witch": "/assets/tcg/roles/role-witch.svg",
+  "Medium": "/assets/tcg/roles/role-medium.svg",
+  "Jester": "/assets/tcg/roles/role-jester.svg",
+  "Cursed Villager": "/assets/tcg/roles/role-cursed-villager.svg",
+  "Prince": "/assets/tcg/roles/role-prince.svg",
+  "Priest": "/assets/tcg/roles/role-priest.svg",
+  "Lycan": "/assets/tcg/roles/role-lycan.svg",
+  "Sorcerer": "/assets/tcg/roles/role-sorcerer.svg",
+  "Tough Guy": "/assets/tcg/roles/role-tough-guy.svg"
+};
+const TCG_SKIN_ASSETS = {
+  "Nocturne Wolf": "/assets/tcg/skins/skin-nocturne-wolf.svg",
+  "Blood Moon Alpha": "/assets/tcg/skins/skin-blood-moon-alpha.svg",
+  "Silver Fang": "/assets/tcg/skins/skin-silver-fang.svg",
+  "Village Guardian": "/assets/tcg/skins/skin-village-guardian.svg",
+  "Royal Villager": "/assets/tcg/skins/skin-royal-villager.svg",
+  "Lantern Keeper": "/assets/tcg/skins/skin-lantern-keeper.svg",
+  "Astral Seer": "/assets/tcg/skins/skin-astral-seer.svg",
+  "Crystal Oracle": "/assets/tcg/skins/skin-crystal-oracle.svg",
+  "Neon Medic": "/assets/tcg/skins/skin-neon-medic.svg",
+  "Emerald Healer": "/assets/tcg/skins/skin-emerald-healer.svg",
+  "Iron Bodyguard": "/assets/tcg/skins/skin-iron-bodyguard.svg",
+  "Void Witch": "/assets/tcg/skins/skin-void-witch.svg",
+  "Potion Witch": "/assets/tcg/skins/skin-potion-witch.svg",
+  "Raven Hunter": "/assets/tcg/skins/skin-raven-hunter.svg",
+  "Ghost Medium": "/assets/tcg/skins/skin-ghost-medium.svg",
+  "Golden Prince": "/assets/tcg/skins/skin-golden-prince.svg",
+  "Chaos Jester": "/assets/tcg/skins/skin-chaos-jester.svg",
+  "Holy Priest": "/assets/tcg/skins/skin-holy-priest.svg"
+};
+const TCG_EFFECT_ASSETS = {
+  "Werewolf Maul": "/assets/tcg/effects/effect-werewolf-maul.svg",
+  "Alpha Rend": "/assets/tcg/effects/effect-alpha-rend.svg",
+  "Seer Vision": "/assets/tcg/effects/effect-seer-vision.svg",
+  "Doctor Pulse": "/assets/tcg/effects/effect-doctor-pulse.svg",
+  "Guard Wall": "/assets/tcg/effects/effect-guard-wall.svg",
+  "Witch Poison": "/assets/tcg/effects/effect-witch-poison.svg",
+  "Hunter Shot": "/assets/tcg/effects/effect-hunter-shot.svg",
+  "Mayor Crown": "/assets/tcg/effects/effect-mayor-crown.svg",
+  "Death Smoke": "/assets/tcg/effects/effect-death-smoke.svg",
+  "Victory Nova": "/assets/tcg/effects/effect-victory-nova.svg",
+  "Double Vision": "/assets/tcg/effects/effect-double-vision.svg",
+  "Blood Moon": "/assets/tcg/effects/effect-blood-moon.svg"
+};
+function roleAsset(role) { return TCG_ROLE_ASSETS[role] || '/assets/tcg/templates/rare.svg'; }
+function effectAsset(name, fallback = '/assets/tcg/effects/effect-victory-nova.svg') { return TCG_EFFECT_ASSETS[name] || fallback; }
+
 let roomState = null;
 let me = null;
 let latestRoomList = [];
@@ -435,9 +491,10 @@ function renderRole() {
     els.privateInfo.textContent = '';
     return;
   }
-  const meta = ROLE_META[me.role] || me.roleMeta || { emoji:'❔', aura:'', desc:'' };
-  els.roleCard.className = `role-card ${meta.aura}`;
-  els.roleCard.innerHTML = `<div class="role-emoji">${meta.emoji}</div><div class="role-name">${escapeHtml(me.role)}</div><div class="role-desc">${escapeHtml(meta.desc)}</div>${me.equippedPower ? `<div class="power-mini">⚡ Power aktif: ${escapeHtml(itemName(me.equippedPower))}</div>` : ''}`;
+  const meta = ROLE_META[me.role] || me.roleMeta || { emoji:'', aura:'', desc:'' };
+  const art = roleAsset(me.role);
+  els.roleCard.className = `role-card role-card-tcg ${meta.aura}`;
+  els.roleCard.innerHTML = `<div class="role-card-art-wrap"><img class="role-card-art" src="${art}" alt="${escapeHtml(me.role)} TCG card" loading="lazy"></div><div class="role-name">${escapeHtml(me.role)}</div><div class="role-desc">${escapeHtml(meta.desc)}</div>${me.equippedPower ? `<div class="power-mini">Power aktif: ${escapeHtml(itemName(me.equippedPower))}</div>` : ''}`;
   const extra = [];
   if (me.isMayor) extra.push(`👑 Kamu adalah Kepala Desa. Vote kamu bernilai ${me.voteWeight || 2} suara.`);
   if (me.equippedPower) extra.push(`⚡ Power Item: ${itemName(me.equippedPower)}.`);
@@ -587,7 +644,7 @@ function isWolf(role) { return role === 'Werewolf' || role === 'Alpha Werewolf';
 
 function showCinematic(a) {
   const map = {
-    roleReveal: '/assets/inventory-box.svg', mayor: '/assets/trophy.svg', nightRole: '/assets/crate-moon.svg', attack: '/assets/wolf-attack.svg', death: '/assets/rarity-mythic.svg', saved: '/assets/guard-shield.svg', seer: '/assets/seer-orb.svg', heal: '/assets/doctor-drone.svg', guard: '/assets/guard-shield.svg', poison: '/assets/witch-vial.svg', vote: '/assets/coin-stack.svg', execution: '/assets/rarity-legendary.svg', hunter: '/assets/hunter-bow.svg', hunterShot: '/assets/hunter-bow.svg', victory: '/assets/trophy.svg', defeat: '/assets/rarity-common.svg', wolfWin: '/assets/wolf-attack.svg', villageWin: '/assets/trophy.svg', jesterWin: '/assets/rarity-epic.svg', blocked: '/assets/guard-shield.svg', cursed: '/assets/wolf-attack.svg', prince: '/assets/trophy.svg', bless: '/assets/guard-shield.svg', powerItem: '/assets/rarity-legendary.svg', crate: '/assets/inventory-box.svg'
+    roleReveal: '/assets/tcg/templates/epic.svg', mayor: effectAsset('Mayor Crown'), nightRole: effectAsset('Blood Moon'), attack: effectAsset('Werewolf Maul'), death: effectAsset('Death Smoke'), saved: effectAsset('Guard Wall'), seer: effectAsset('Seer Vision'), heal: effectAsset('Doctor Pulse'), guard: effectAsset('Guard Wall'), poison: effectAsset('Witch Poison'), vote: effectAsset('Mayor Crown'), execution: effectAsset('Death Smoke'), hunter: effectAsset('Hunter Shot'), hunterShot: effectAsset('Hunter Shot'), victory: effectAsset('Victory Nova'), defeat: effectAsset('Death Smoke'), wolfWin: effectAsset('Alpha Rend'), villageWin: effectAsset('Victory Nova'), jesterWin: '/assets/tcg/roles/role-jester.svg', blocked: effectAsset('Guard Wall'), cursed: effectAsset('Blood Moon'), prince: effectAsset('Mayor Crown'), bless: effectAsset('Guard Wall'), powerItem: effectAsset('Double Vision'), crate: '/assets/tcg/templates/legendary.svg'
   };
   const actorAsset = map[a.type] || '/assets/wolf-attack.svg';
   const targetAsset = a.type === 'attack' ? '/assets/rarity-mythic.svg' : a.type === 'seer' ? '/assets/seer-orb.svg' : a.type === 'heal' ? '/assets/doctor-drone.svg' : a.type === 'death' ? '/assets/rarity-common.svg' : '/assets/rarity-legendary.svg';

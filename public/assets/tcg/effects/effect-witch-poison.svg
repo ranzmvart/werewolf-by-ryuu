@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-label="Witch Poison">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#365314"/><stop offset=".55" stop-color="#581c87"/><stop offset="1" stop-color="#020617"/></linearGradient>
+  <radialGradient id="shine" cx="35%" cy="18%" r="70%"><stop offset="0" stop-color="white" stop-opacity=".55"/><stop offset=".45" stop-color="#a3e635" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".22" stop-color="#a3e635" stop-opacity=".85"/><stop offset=".5" stop-color="#111827"/><stop offset=".82" stop-color="#a3e635" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity=".65"/></linearGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="24" stdDeviation="18" flood-color="#000" flood-opacity=".55"/></filter>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="noise" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M0 44L44 0M-11 11L11-11M33 55L55 33" stroke="#fff" stroke-opacity=".04" stroke-width="2"/></pattern>
+</defs>
+<rect width="800" height="800" rx="120" fill="#020617"/>
+<rect x="40" y="40" width="720" height="720" rx="95" fill="url(#bg)" stroke="url(#metal)" stroke-width="18"/>
+<rect x="82" y="82" width="636" height="636" rx="70" fill="url(#shine)"/>
+<path d="M300 170 H500 L480 305 C560 360 610 455 610 560 C610 670 520 735 400 735 C280 735 190 670 190 560 C190 455 240 360 320 305Z" fill="#a3e635" opacity=".5" stroke="#fff" stroke-width="20" filter="url(#glow)"/><circle cx="332" cy="540" r="32" fill="#fff" opacity=".5"/><circle cx="470" cy="505" r="22" fill="#fff" opacity=".5"/>
+<text x="400" y="742" font-family="Inter,Arial,sans-serif" font-weight="900" font-size="42" text-anchor="middle" fill="#f8fafc">Witch Poison</text>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1260" viewBox="0 0 900 1260" role="img" aria-label="Emerald Healer card">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#042f2e"/><stop offset=".55" stop-color="#0e7490"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  <radialGradient id="shine" cx="35%" cy="18%" r="70%"><stop offset="0" stop-color="white" stop-opacity=".55"/><stop offset=".45" stop-color="#22d3ee" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".22" stop-color="#22d3ee" stop-opacity=".85"/><stop offset=".5" stop-color="#111827"/><stop offset=".82" stop-color="#22d3ee" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity=".65"/></linearGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="24" stdDeviation="18" flood-color="#000" flood-opacity=".55"/></filter>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <pattern id="noise" width="44" height="44" patternUnits="userSpaceOnUse"><path d="M0 44L44 0M-11 11L11-11M33 55L55 33" stroke="#fff" stroke-opacity=".04" stroke-width="2"/></pattern>
+</defs>
+<rect width="900" height="1260" rx="72" fill="#020617"/>
+<rect x="34" y="34" width="832" height="1192" rx="58" fill="url(#bg)" stroke="url(#metal)" stroke-width="22"/>
+<rect x="70" y="78" width="760" height="1110" rx="42" fill="#020617" opacity=".55"/>
+<rect x="70" y="78" width="760" height="1110" rx="42" fill="url(#noise)"/>
+<rect x="104" y="128" width="692" height="760" rx="36" fill="url(#shine)" stroke="#22d3ee" stroke-width="5" opacity=".96"/>
+<circle cx="132" cy="156" r="6" fill="#fff" opacity=".72"/><circle cx="768" cy="156" r="6" fill="#fff" opacity=".72"/><circle cx="132" cy="860" r="6" fill="#fff" opacity=".72"/><circle cx="768" cy="860" r="6" fill="#fff" opacity=".72"/>
+<g filter="url(#shadow)">
+  <path d="M450 315 C560 315 650 405 650 515 C650 690 450 780 450 780 C450 780 250 690 250 515 C250 405 340 315 450 315Z" fill="#0f172a" stroke="#22d3ee" stroke-width="14"/>
+  <rect x="413" y="415" width="74" height="210" rx="20" fill="#22d3ee" filter="url(#glow)"/>
+  <rect x="345" y="483" width="210" height="74" rx="20" fill="#22d3ee" filter="url(#glow)"/>
+  <path d="M330 700 C410 660 490 660 570 700" stroke="#dcfce7" stroke-width="16" fill="none" stroke-linecap="round"/>
+</g>
+<rect x="105" y="930" width="690" height="94" rx="26" fill="#020617" opacity=".82" stroke="#22d3ee" stroke-width="3"/>
+<text x="450" y="988" font-family="Inter,Arial,sans-serif" font-weight="900" font-size="46" text-anchor="middle" fill="#f8fafc">Emerald Healer</text>
+<rect x="145" y="1048" width="610" height="84" rx="24" fill="#0f172a" opacity=".86" stroke="#fff" stroke-opacity=".08"/>
+<text x="450" y="1101" font-family="Inter,Arial,sans-serif" font-weight="800" font-size="30" text-anchor="middle" fill="#22d3ee">Doctor skin</text>
+<text x="450" y="1176" font-family="Inter,Arial,sans-serif" font-weight="900" font-size="24" letter-spacing="7" text-anchor="middle" fill="#cbd5e1">RARE</text>
+</svg>
