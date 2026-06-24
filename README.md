@@ -1,43 +1,39 @@
-# Werewolf by Ryuu v3.2 Final
+# Werewolf by Ryuu v3.3 Final
 
-Versi final ini berisi update sesuai permintaan:
+Update ini menambahkan:
 
-- Login/register hilang setelah pemain login.
-- Menu akun berubah menjadi profil pemain ringkas.
-- Shop, Inventory, Profil lengkap, dan Leaderboard dibuka sebagai halaman terpisah, bukan menumpuk di menu utama.
-- Power item menjadi item konsumsi: beli 1 = stok 1, beli 2 = stok 2.
-- Power item hanya aktif satu kali dalam game/situasi yang sesuai, lalu stok berkurang 1.
-- Skin, badge, frame, inventory, statistik, leaderboard, dan shop tetap aktif.
-- Cinematic role/aksi dibuat lebih keren dengan animasi 3D-style CSS: Werewolf memangsa, Seer vision, heal, death, victory, dan power item.
-- Owner account tetap ada:
-  - Username: ryuu
-  - PIN: 291206
-  - Poin: unlimited
-- Cocok untuk Railway dengan volume `/app/data` agar data pemain tidak hilang.
+- Open Crate / Gacha: Moon Crate, Blood Moon Crate, Royal Legend Crate.
+- Rarity: Common, Rare, Epic, Legendary, Mythic.
+- Reward crate: poin, skin, frame, badge, dan power item sekali pakai.
+- Friends system: cari username, add friend, accept request, hapus teman.
+- Invite friend ke lobby: teman bisa join dari halaman Friends, password room dibypass khusus invite.
+- Persistent rooms: room aktif disimpan ke `/app/data/rooms.json` agar bisa dipulihkan setelah Railway restart/redeploy.
+- Reconnect diperkuat: pemain/host dapat kembali memakai akun atau session browser yang sama.
 
-## Upload ke GitHub
+## Persistent data Railway
 
-Upload isi folder ini ke root repo, bukan foldernya sebagai subfolder.
+Pasang Railway Volume ke:
 
-Struktur yang benar:
-
-```text
-werewolf-by-ryuu/
-├── public/
-│   ├── index.html
-│   ├── style.css
-│   └── client.js
-├── package.json
-├── railway.json
-├── Dockerfile
-├── README.md
-└── server.js
+```txt
+/app/data
 ```
 
-## Railway Volume
+File yang disimpan:
 
-Agar akun, PIN, poin, statistik, inventory, dan foto profil tidak hilang, pasang Railway Volume:
+```txt
+/app/data/players.json
+/app/data/rooms.json
+```
 
-```text
-Mount path: /app/data
+## Deploy
+
+```bash
+npm install
+npm start
+```
+
+Railway akan memakai:
+
+```txt
+Start Command: npm start
 ```

@@ -34,6 +34,9 @@ const peers = new Map();
 let accountProfile = null;
 let shopCatalog = [];
 let latestLeaderboards = null;
+let crateCatalog = [];
+let latestSocial = { friends: [], requests: [], sent: [], roomInvites: [] };
+let friendSearchResults = [];
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -46,7 +49,7 @@ const els = {
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
   guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
-  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose')
+  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), cratePanel: $('cratePanel'), friendsPanel: $('friendsPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), crateTabBtn: $('crateTabBtn'), friendsTabBtn: $('friendsTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose')
 };
 
 const savedName = localStorage.getItem('werewolfName');
@@ -311,16 +314,30 @@ socket.on('rooms:list', (rooms) => {
   renderRoomBrowser();
 });
 
-socket.on('shop:catalog', ({ shop, leaderboards } = {}) => {
+socket.on('shop:catalog', ({ shop, crates, leaderboards } = {}) => {
   if (Array.isArray(shop)) shopCatalog = shop;
+  if (Array.isArray(crates)) crateCatalog = crates;
   if (leaderboards) latestLeaderboards = leaderboards;
   renderAccountHub();
 });
 
-socket.on('profile:update', ({ profile, shop, leaderboards } = {}) => {
+socket.on('profile:update', ({ profile, shop, crates, social, leaderboards } = {}) => {
   if (profile) accountProfile = profile;
   if (Array.isArray(shop)) shopCatalog = shop;
+  if (Array.isArray(crates)) crateCatalog = crates;
+  if (social) latestSocial = social;
   if (leaderboards) latestLeaderboards = leaderboards;
+  renderAccountHub();
+});
+socket.on('social:update', ({ social, profile } = {}) => {
+  if (social) latestSocial = social;
+  if (profile) accountProfile = profile;
+  renderAccountHub();
+  if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
+});
+socket.on('social:room-invite', (invite) => {
+  latestSocial.roomInvites = [invite, ...(latestSocial.roomInvites || [])].slice(0, 10);
+  toast('Invite lobby', `${invite.from} mengajak kamu ke ${invite.roomName || invite.code}.`);
   renderAccountHub();
 });
 
@@ -626,6 +643,8 @@ function autoLoginAccount() {
     if (res?.ok) {
       accountProfile = res.profile;
       shopCatalog = res.shop || shopCatalog;
+      crateCatalog = res.crates || crateCatalog;
+      latestSocial = res.social || latestSocial;
       latestLeaderboards = res.leaderboards || latestLeaderboards;
       renderAccountHub();
       if (!els.game.classList.contains('hidden') && getSession()?.code) {
@@ -658,6 +677,8 @@ els.registerBtn?.addEventListener('click', () => {
     if (!res?.ok) return toast('Daftar gagal', res?.error || 'Coba lagi.');
     accountProfile = res.profile;
     shopCatalog = res.shop || shopCatalog;
+    crateCatalog = res.crates || crateCatalog;
+    latestSocial = res.social || latestSocial;
     latestLeaderboards = res.leaderboards || latestLeaderboards;
     saveAuth(username, pin);
     els.nameInput.value = accountProfile.username;
@@ -672,6 +693,8 @@ els.loginBtn?.addEventListener('click', () => {
     if (!res?.ok) return toast('Login gagal', res?.error || 'Coba lagi.');
     accountProfile = res.profile;
     shopCatalog = res.shop || shopCatalog;
+    crateCatalog = res.crates || crateCatalog;
+    latestSocial = res.social || latestSocial;
     latestLeaderboards = res.leaderboards || latestLeaderboards;
     saveAuth(username, pin);
     els.nameInput.value = accountProfile.username;
@@ -680,7 +703,7 @@ els.loginBtn?.addEventListener('click', () => {
   });
 });
 
-for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => openAccountPage(tab));
+for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb'],[els.crateTabBtn,'crates'],[els.friendsTabBtn,'friends']]) btn?.addEventListener('click', () => openAccountPage(tab));
 els.accountPageClose?.addEventListener('click', closeAccountPage);
 
 function renderAccountHub() {
@@ -701,7 +724,7 @@ function renderAccountHub() {
     els.nameInput.disabled = false;
     els.profileSummary?.classList.add('hidden');
   }
-  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderGameProfileBox();
+  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderCrates(); renderFriends(); renderGameProfileBox();
   if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
 }
 
@@ -717,13 +740,15 @@ function refreshAccountPage() {
     profile: ['Profil Pemain', 'Statistik, foto profil, badge, frame, dan equip aktif.'],
     shop: ['Shop', 'Beli skin permanen dan power item sekali pakai. Power bisa dibeli berkali-kali.'],
     inv: ['Inventory', 'Lihat stok item, equip skin/badge/frame, dan pilih power item yang akan dipakai.'],
-    lb: ['Leaderboard Top 100', 'Peringkat berdasarkan poin, kemenangan, team Werewolf, dan team Village.']
+    lb: ['Leaderboard Top 100', 'Peringkat berdasarkan poin, kemenangan, team Werewolf, dan team Village.'],
+    crates: ['Open Crate / Gacha', 'Buka crate untuk mendapatkan item Common, Rare, Epic, Legendary, dan Mythic.'],
+    friends: ['Friends & Invite Lobby', 'Tambah teman, terima request, dan invite teman ke lobby kamu.']
   };
-  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard();
+  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderCrates(); renderFriends();
   const [title, sub] = titles[activeHubTab] || titles.profile;
   if (els.accountPageTitle) els.accountPageTitle.textContent = title;
   if (els.accountPageSub) els.accountPageSub.textContent = sub;
-  const source = activeHubTab === 'shop' ? els.shopPanel : activeHubTab === 'inv' ? els.inventoryPanel : activeHubTab === 'lb' ? els.leaderboardPanel : els.profilePanel;
+  const source = activeHubTab === 'shop' ? els.shopPanel : activeHubTab === 'inv' ? els.inventoryPanel : activeHubTab === 'lb' ? els.leaderboardPanel : activeHubTab === 'crates' ? els.cratePanel : activeHubTab === 'friends' ? els.friendsPanel : els.profilePanel;
   if (els.accountPageContent && source) els.accountPageContent.innerHTML = source.innerHTML;
   attachCopiedProfileAvatarHandler();
 }
@@ -831,6 +856,68 @@ function renderLeaderboard() {
 window.setLbTab = (id) => { activeLbTab = id; renderLeaderboard(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); };
 window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dibeli', `${res.item?.name || itemId} masuk inventory.`); });
 window.equipItem = (itemId) => socket.emit('shop:equip', { itemId }, (res) => { if (!res?.ok) return toast('Gagal equip', res?.error || 'Belum dimiliki.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dipakai', `${res.item?.name || itemId} sekarang aktif.`); });
+
+
+function renderCrates() {
+  if (!els.cratePanel) return;
+  if (!accountProfile) { els.cratePanel.innerHTML = '<div class="mini-note">Login dulu untuk membuka crate.</div>'; return; }
+  if (!crateCatalog.length) { els.cratePanel.innerHTML = '<div class="mini-note">Crate belum dimuat.</div>'; return; }
+  const points = accountProfile?.isAdmin ? Infinity : Number(accountProfile?.points || 0);
+  els.cratePanel.innerHTML = `<div class="crate-grid">${crateCatalog.map(c => {
+    const weights = c.weights || {};
+    return `<div class="crate-card"><div class="crate-box">${escapeHtml(c.emoji || '🎁')}</div><div class="crate-title">${escapeHtml(c.name)}</div><div class="shop-desc">${escapeHtml(c.desc || '')}</div><div class="crate-odds"><span>Rare ${weights.rare || 0}%</span><span>Epic ${weights.epic || 0}%</span><span>Legendary ${weights.legendary || 0}%</span><span>Mythic ${weights.mythic || 0}%</span></div><div class="shop-actions"><span class="price">${c.price} poin</span><button class="btn primary small" ${points < c.price ? 'disabled' : ''} onclick="openCrate('${c.id}')">Open</button></div></div>`;
+  }).join('')}</div><div class="mini-note">Gacha memakai poin game. Hadiah bisa poin, skin, frame, badge, atau power item sekali pakai.</div>`;
+}
+window.openCrate = (crateId) => {
+  setUiLoading(true, 'Membuka crate...');
+  socket.emit('crate:open', { crateId }, (res) => {
+    softHideLoader(300);
+    if (!res?.ok) return toast('Open crate gagal', res?.error || 'Poin belum cukup.');
+    if (res.profile) accountProfile = res.profile;
+    const r = res.reward || {};
+    renderAccountHub();
+    if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
+    showCinematic({ type: 'crate', title: `${r.rarityEmoji || '🎁'} ${r.rarityLabel || 'Reward'}!`, text: `${r.emoji || ''} ${r.name || 'Hadiah'} ${r.qty ? 'x'+r.qty : ''}`, aura: r.rarity || 'amber' });
+    toast('Crate terbuka', `${r.rarityLabel || 'Reward'}: ${r.name || 'Hadiah'}`);
+  });
+};
+
+function renderFriends() {
+  if (!els.friendsPanel) return;
+  if (!accountProfile) { els.friendsPanel.innerHTML = '<div class="mini-note">Login dulu untuk fitur teman.</div>'; return; }
+  const social = latestSocial || { friends: [], requests: [], sent: [], roomInvites: [] };
+  els.friendsPanel.innerHTML = `
+    <div class="friends-page">
+      <div class="friend-search"><input id="friendSearchInput" placeholder="Cari username teman..." maxlength="18"><button class="btn primary small" onclick="searchFriend()">Cari</button></div>
+      <div id="friendSearchResults" class="friend-list">${renderFriendSearchResults()}</div>
+      <h4>📩 Invite Lobby</h4>
+      <div class="friend-list">${(social.roomInvites || []).length ? social.roomInvites.map(inv => `<div class="friend-row"><div><b>${escapeHtml(inv.from)}</b><span>Mengajak ke ${escapeHtml(inv.roomName || inv.code)} • ${escapeHtml(inv.code)}</span></div><button class="btn primary small" onclick="joinInviteRoom('${escapeHtml(inv.code)}')">Join</button></div>`).join('') : '<div class="mini-note">Belum ada invite lobby.</div>'}</div>
+      <h4>✅ Teman</h4>
+      <div class="friend-list">${(social.friends || []).length ? social.friends.map(f => `<div class="friend-row"><div><b>${escapeHtml(f.username)} ${f.online ? '🟢' : '⚫'}</b><span>${f.online ? 'Online' : 'Offline'}</span></div><div class="item-stack"><button class="btn primary small" onclick="inviteFriend('${escapeHtml(f.username)}')">Invite</button><button class="btn secondary small" onclick="removeFriend('${escapeHtml(f.username)}')">Hapus</button></div></div>`).join('') : '<div class="mini-note">Belum ada teman. Cari username lalu Add Friend.</div>'}</div>
+      <h4>⏳ Request Masuk</h4>
+      <div class="friend-list">${(social.requests || []).length ? social.requests.map(f => `<div class="friend-row"><div><b>${escapeHtml(f.username)}</b><span>Ingin berteman denganmu</span></div><button class="btn primary small" onclick="acceptFriend('${escapeHtml(f.username)}')">Terima</button></div>`).join('') : '<div class="mini-note">Tidak ada request masuk.</div>'}</div>
+      <h4>📤 Request Terkirim</h4>
+      <div class="friend-list">${(social.sent || []).length ? social.sent.map(f => `<div class="friend-row"><div><b>${escapeHtml(f.username)}</b><span>Menunggu diterima</span></div></div>`).join('') : '<div class="mini-note">Tidak ada request terkirim.</div>'}</div>
+    </div>`;
+}
+function renderFriendSearchResults() {
+  if (!friendSearchResults.length) return '<div class="mini-note">Cari username untuk menambahkan teman.</div>';
+  return friendSearchResults.map(u => `<div class="friend-row"><div><b>${escapeHtml(u.username)} ${u.online ? '🟢' : '⚫'}</b><span>${u.isFriend ? 'Sudah berteman' : u.pending ? 'Request masuk' : u.requested ? 'Request terkirim' : 'Belum berteman'}</span></div>${u.isFriend ? `<button class="btn primary small" onclick="inviteFriend('${escapeHtml(u.username)}')">Invite</button>` : u.pending ? `<button class="btn primary small" onclick="acceptFriend('${escapeHtml(u.username)}')">Terima</button>` : u.requested ? '<span class="owned">Pending</span>' : `<button class="btn primary small" onclick="addFriend('${escapeHtml(u.username)}')">Add Friend</button>`}</div>`).join('');
+}
+window.searchFriend = () => {
+  const q = els.accountPageContent?.querySelector('#friendSearchInput')?.value || '';
+  socket.emit('social:search', { query: q }, (res) => {
+    if (!res?.ok) return toast('Search gagal', res?.error || 'Coba lagi.');
+    friendSearchResults = res.users || [];
+    const box = els.accountPageContent?.querySelector('#friendSearchResults');
+    if (box) box.innerHTML = renderFriendSearchResults();
+  });
+};
+window.addFriend = (username) => socket.emit('social:request', { username }, (res) => { if (!res?.ok) return toast('Gagal add', res?.error || 'Coba lagi.'); latestSocial = res.social || latestSocial; friendSearchResults = []; refreshAccountPage(); toast('Request terkirim', `Request teman ke ${username}`); });
+window.acceptFriend = (username) => socket.emit('social:accept', { username }, (res) => { if (!res?.ok) return toast('Gagal terima', res?.error || 'Coba lagi.'); latestSocial = res.social || latestSocial; refreshAccountPage(); toast('Teman baru', `${username} sekarang temanmu.`); });
+window.removeFriend = (username) => socket.emit('social:remove', { username }, (res) => { if (!res?.ok) return toast('Gagal hapus', res?.error || 'Coba lagi.'); latestSocial = res.social || latestSocial; refreshAccountPage(); toast('Teman dihapus', username); });
+window.inviteFriend = (username) => socket.emit('social:invite-room', { username }, (res) => { if (!res?.ok) return toast('Gagal invite', res?.error || 'Kamu harus berada di room.'); toast('Invite dikirim', `${username} diajak ke lobby ${res.invite?.code || ''}`); });
+window.joinInviteRoom = (code) => { els.codeInput.value = code; socket.emit('room:join', { name: accountProfile?.username || '', code, password: '', clientId }, (res) => { if (!res?.ok) return toast('Gagal join invite', res?.error || 'Coba lagi.'); saveSession(res.code, res.playerId || clientId); enterGame(); }); };
 
 function renderGameProfileBox() {
   if (!els.gameProfileBox) return;

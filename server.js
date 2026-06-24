@@ -23,6 +23,7 @@ const yts = require('yt-search');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = process.env.DB_FILE || path.join(DATA_DIR, 'players.json');
+const ROOMS_FILE = process.env.ROOMS_FILE || path.join(DATA_DIR, 'rooms.json');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const SHOP_ITEMS = [
@@ -45,6 +46,78 @@ const SHOP_ITEMS = [
   { id: 'power_lucky_charm', type: 'power', emoji: '🍀', name: 'Lucky Charm', price: 2400, desc: 'Sekali pakai: kamu bisa selamat dari satu serangan malam.' },
   { id: 'power_shadow_cloak', type: 'power', emoji: '🌑', name: 'Shadow Cloak', price: 2500, desc: 'Sekali pakai: hasil terawangan Seer terhadapmu tersamarkan sebagai Village.' }
 ];
+
+
+// Extra crate-exclusive cosmetics and badges. They can also appear in gacha rewards.
+SHOP_ITEMS.push(
+  { id: 'skin_abyss_king', type: 'skin', rarity: 'legendary', emoji: '👑', name: 'Abyss King', price: 3600, desc: 'Legendary skin dengan aura raja kegelapan.', className: 'skin-blood' },
+  { id: 'skin_star_seer', type: 'skin', rarity: 'epic', emoji: '🌌', name: 'Star Seer', price: 2600, desc: 'Epic skin bercahaya bintang untuk Seer.', className: 'skin-mystic' },
+  { id: 'skin_emerald_guardian', type: 'skin', rarity: 'rare', emoji: '🟢', name: 'Emerald Guardian', price: 1500, desc: 'Rare skin hijau untuk pelindung desa.', className: 'skin-neon' },
+  { id: 'frame_dragon_flame', type: 'frame', rarity: 'legendary', emoji: '🐉', name: 'Dragon Flame Frame', price: 3900, desc: 'Legendary frame api naga di foto profil.', className: 'frame-wolf' },
+  { id: 'frame_void_crystal', type: 'frame', rarity: 'epic', emoji: '💠', name: 'Void Crystal Frame', price: 2700, desc: 'Epic frame kristal void.', className: 'frame-crystal' },
+  { id: 'badge_crate_legend', type: 'badge', rarity: 'legendary', emoji: '💫', name: 'Crate Legend', price: 3200, desc: 'Badge pemain beruntung dari crate.' },
+  { id: 'badge_epic_luck', type: 'badge', rarity: 'epic', emoji: '✨', name: 'Epic Luck', price: 2100, desc: 'Badge epic untuk pembuka crate.' },
+  { id: 'badge_village_vip', type: 'badge', rarity: 'rare', emoji: '🎖️', name: 'Village VIP', price: 1200, desc: 'Badge rare untuk warga ternama.' }
+);
+
+const RARITY_META = {
+  common: { label: 'Common', emoji: '⚪', color: '#94a3b8' },
+  rare: { label: 'Rare', emoji: '🔵', color: '#38bdf8' },
+  epic: { label: 'Epic', emoji: '🟣', color: '#c084fc' },
+  legendary: { label: 'Legendary', emoji: '🟡', color: '#facc15' },
+  mythic: { label: 'Mythic', emoji: '🔴', color: '#fb7185' }
+};
+
+const CRATE_DEFS = [
+  {
+    id: 'crate_moon', emoji: '🌙', name: 'Moon Crate', price: 450,
+    desc: 'Crate murah berisi poin, power kecil, badge, dan rare cosmetic.',
+    weights: { common: 62, rare: 27, epic: 9, legendary: 2, mythic: 0 },
+    rewards: [
+      { rarity: 'common', type: 'points', amount: 120, name: '120 Poin' },
+      { rarity: 'common', type: 'item', itemId: 'power_vote_triple', qty: 1 },
+      { rarity: 'common', type: 'item', itemId: 'power_seer_double', qty: 1 },
+      { rarity: 'rare', type: 'item', itemId: 'badge_village_vip', qty: 1 },
+      { rarity: 'rare', type: 'item', itemId: 'skin_emerald_guardian', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'badge_epic_luck', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'frame_void_crystal', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'badge_crate_legend', qty: 1 }
+    ]
+  },
+  {
+    id: 'crate_blood', emoji: '🩸', name: 'Blood Moon Crate', price: 1300,
+    desc: 'Crate premium dengan peluang Epic dan Legendary lebih besar.',
+    weights: { common: 32, rare: 38, epic: 22, legendary: 7, mythic: 1 },
+    rewards: [
+      { rarity: 'common', type: 'points', amount: 350, name: '350 Poin' },
+      { rarity: 'rare', type: 'item', itemId: 'power_wolf_double', qty: 1 },
+      { rarity: 'rare', type: 'item', itemId: 'power_doctor_double', qty: 1 },
+      { rarity: 'rare', type: 'item', itemId: 'frame_gold', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'skin_star_seer', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'frame_void_crystal', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'skin_abyss_king', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'frame_dragon_flame', qty: 1 },
+      { rarity: 'mythic', type: 'points', amount: 5000, name: 'Jackpot 5000 Poin' }
+    ]
+  },
+  {
+    id: 'crate_royal', emoji: '👑', name: 'Royal Legend Crate', price: 2800,
+    desc: 'Crate mahal untuk pemburu Legendary/Mythic. Hadiah kosmetik dan power item terbaik.',
+    weights: { common: 10, rare: 30, epic: 36, legendary: 20, mythic: 4 },
+    rewards: [
+      { rarity: 'rare', type: 'item', itemId: 'power_lucky_charm', qty: 1 },
+      { rarity: 'rare', type: 'item', itemId: 'power_shadow_cloak', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'power_witch_dual', qty: 2 },
+      { rarity: 'epic', type: 'item', itemId: 'skin_star_seer', qty: 1 },
+      { rarity: 'epic', type: 'item', itemId: 'badge_mastermind', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'skin_abyss_king', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'frame_dragon_flame', qty: 1 },
+      { rarity: 'legendary', type: 'item', itemId: 'badge_crate_legend', qty: 1 },
+      { rarity: 'mythic', type: 'points', amount: 12000, name: 'Mythic Jackpot 12000 Poin' }
+    ]
+  }
+];
+
 const SHOP_BY_ID = new Map(SHOP_ITEMS.map(item => [item.id, item]));
 const authSessions = new Map(); // socket.id -> usernameKey
 let db = loadDb();
@@ -99,6 +172,11 @@ function createUser(username, pin, avatar = '') {
     inventory: { badge_founder: 1 },
     equipped: { skin: null, frame: null, badge: 'badge_founder', power: null },
     stats: createStats(),
+    friends: {},
+    friendRequests: {},
+    sentFriendRequests: {},
+    roomInvites: [],
+    cratesOpened: 0,
     createdAt: Date.now(), updatedAt: Date.now(), lastLoginAt: Date.now()
   };
 }
@@ -137,8 +215,7 @@ function sanitizeAvatar(data) {
 function getUserByKey(key) { return db.users[String(key || '').toLowerCase()] || null; }
 function publicProfile(user) {
   if (!user) return null;
-  user.inventory = user.inventory || {};
-  user.equipped = user.equipped || {};
+  normalizeUser(user);
   validateEquippedPower(user);
   const inv = user.inventory || {};
   return {
@@ -150,10 +227,47 @@ function publicProfile(user) {
     inventory: inv,
     equipped: user.equipped || {},
     stats: user.stats || createStats(),
+    cratesOpened: Number(user.cratesOpened || 0),
+    friendsCount: Object.keys(user.friends || {}).length,
+    pendingRequests: Object.keys(user.friendRequests || {}).length,
+    pendingInvites: (user.roomInvites || []).length,
     ownedCount: Object.keys(inv).length
   };
 }
 function publicShop() { return SHOP_ITEMS; }
+function publicCrates() { return CRATE_DEFS.map(c => ({ id: c.id, emoji: c.emoji, name: c.name, price: c.price, desc: c.desc, weights: c.weights })); }
+function normalizeUser(user) {
+  if (!user) return null;
+  user.inventory = user.inventory || {};
+  user.equipped = user.equipped || {};
+  user.stats = user.stats || createStats();
+  user.friends = user.friends || {};
+  user.friendRequests = user.friendRequests || {};
+  user.sentFriendRequests = user.sentFriendRequests || {};
+  user.roomInvites = Array.isArray(user.roomInvites) ? user.roomInvites.slice(-20) : [];
+  user.cratesOpened = Number(user.cratesOpened || 0);
+  return user;
+}
+function isUserOnline(key) {
+  const k = String(key || '').toLowerCase();
+  for (const sessionKey of authSessions.values()) if (String(sessionKey || '').toLowerCase() === k) return true;
+  return false;
+}
+function emitToAccount(key, event, payload) {
+  const k = String(key || '').toLowerCase();
+  for (const [socketId, sessionKey] of authSessions.entries()) {
+    if (String(sessionKey || '').toLowerCase() === k) io.to(socketId).emit(event, payload);
+  }
+}
+function publicSocial(user) {
+  normalizeUser(user);
+  if (!user) return { friends: [], requests: [], sent: [], roomInvites: [] };
+  const friends = Object.keys(user.friends || {}).map(key => { const u = getUserByKey(key); return u ? { username: u.username, avatar: u.avatar || '', online: isUserOnline(key), since: user.friends[key] } : null; }).filter(Boolean);
+  const requests = Object.keys(user.friendRequests || {}).map(key => { const u = getUserByKey(key); return u ? { username: u.username, avatar: u.avatar || '', at: user.friendRequests[key] } : null; }).filter(Boolean);
+  const sent = Object.keys(user.sentFriendRequests || {}).map(key => { const u = getUserByKey(key); return u ? { username: u.username, avatar: u.avatar || '', at: user.sentFriendRequests[key] } : null; }).filter(Boolean);
+  const roomInvites = (user.roomInvites || []).slice(-10).reverse();
+  return { friends, requests, sent, roomInvites };
+}
 function isPowerItem(itemId) { return SHOP_BY_ID.get(String(itemId || ''))?.type === 'power'; }
 function hasOwned(user, itemId) { return Number(user?.inventory?.[itemId] || 0) > 0; }
 function getItemCount(user, itemId) { return Number(user?.inventory?.[itemId] || 0); }
@@ -213,7 +327,8 @@ function applyProfileToPlayer(p) {
 function notifyProfile(socketOrId, key) {
   const user = getUserByKey(key);
   if (!user) return;
-  const payload = { profile: publicProfile(user), shop: publicShop(), leaderboards: buildLeaderboards() };
+  normalizeUser(user);
+  const payload = { profile: publicProfile(user), shop: publicShop(), crates: publicCrates(), social: publicSocial(user), leaderboards: buildLeaderboards() };
   if (typeof socketOrId === 'string') io.to(socketOrId).emit('profile:update', payload);
   else socketOrId.emit('profile:update', payload);
 }
@@ -251,7 +366,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.2.0-pages-consumable-power-3d' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.3.0-crates-friends-persistent-rooms' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);
@@ -472,6 +587,7 @@ function setRoomMusic(room, music) {
     by: music.by || null
   };
   emitRoomMusic(room);
+  saveRoomsSoon();
 }
 
 function cleanClientId(id) {
@@ -511,6 +627,7 @@ function newRoom(code, hostPlayerId, hostName, options = {}) {
     votes: new Map(),
     mayorVotes: new Map(),
     voice: new Set(),
+    invitedAccounts: new Set(),
     music: {
       status: 'stopped',
       song: null,
@@ -606,12 +723,14 @@ function sendState(room) {
     io.to(p.id).emit('me:state', privateState(room, p.id));
   }
   emitRoomList();
+  saveRoomsSoon();
 }
 
 function addLog(room, text, type = 'info') {
   room.logs.push({ id: nowId(), text, type, at: Date.now() });
   if (room.logs.length > 100) room.logs.shift();
   io.to(room.code).emit('room:log', room.logs[room.logs.length - 1]);
+  saveRoomsSoon();
 }
 
 function narrative(room, title, text, mood = 'dark') {
@@ -1411,9 +1530,64 @@ function leaveCurrentRoom(socket, silent = false) {
 }
 
 
+
+function chooseWeightedRarity(weights = {}) {
+  const entries = Object.entries(weights).filter(([, w]) => Number(w) > 0);
+  const total = entries.reduce((sum, [, w]) => sum + Number(w), 0) || 1;
+  let roll = Math.random() * total;
+  for (const [rarity, weight] of entries) {
+    roll -= Number(weight);
+    if (roll <= 0) return rarity;
+  }
+  return entries[entries.length - 1]?.[0] || 'common';
+}
+function openCrateForUser(user, crateId) {
+  normalizeUser(user);
+  const crate = CRATE_DEFS.find(c => c.id === crateId) || CRATE_DEFS[0];
+  if (!crate) return { ok: false, error: 'Crate tidak ditemukan.' };
+  if (!user.isAdmin && Number(user.points || 0) < crate.price) return { ok: false, error: 'Poin tidak cukup untuk open crate ini.' };
+  if (!user.isAdmin) user.points -= crate.price; else user.points = ADMIN_POINTS;
+  const rarity = chooseWeightedRarity(crate.weights);
+  const pool = crate.rewards.filter(r => r.rarity === rarity);
+  const reward = (pool.length ? pool : crate.rewards)[Math.floor(Math.random() * (pool.length ? pool.length : crate.rewards.length))];
+  const meta = RARITY_META[reward.rarity] || RARITY_META.common;
+  let result = { rarity: reward.rarity, rarityLabel: meta.label, rarityEmoji: meta.emoji, crate: { id: crate.id, name: crate.name, emoji: crate.emoji } };
+  if (reward.type === 'points') {
+    const amount = Number(reward.amount || 0);
+    user.points = user.isAdmin ? ADMIN_POINTS : Number(user.points || 0) + amount;
+    result.type = 'points';
+    result.amount = amount;
+    result.name = reward.name || `${amount} Poin`;
+    result.emoji = '💎';
+  } else {
+    const item = SHOP_BY_ID.get(reward.itemId);
+    if (!item) return { ok: false, error: 'Reward item tidak valid.' };
+    const qty = Math.max(1, Number(reward.qty || 1));
+    user.inventory[item.id] = Number(user.inventory[item.id] || 0) + qty;
+    result.type = 'item';
+    result.item = item;
+    result.qty = qty;
+    result.name = item.name;
+    result.emoji = item.emoji;
+  }
+  user.cratesOpened = Number(user.cratesOpened || 0) + 1;
+  user.updatedAt = Date.now();
+  saveDbSoon();
+  return { ok: true, crate: { id: crate.id, name: crate.name, emoji: crate.emoji }, reward: result, profile: publicProfile(user) };
+}
+function getAuthenticatedUser(socket) {
+  const key = authSessions.get(socket.id);
+  return { key, user: getUserByKey(key) };
+}
+function socialPush(key) {
+  const user = getUserByKey(key);
+  if (!user) return;
+  emitToAccount(key, 'social:update', { social: publicSocial(user), profile: publicProfile(user) });
+}
+
 io.on('connection', socket => {
   socket.emit('rooms:list', getPublicRooms());
-  socket.emit('shop:catalog', { shop: publicShop(), leaderboards: buildLeaderboards() });
+  socket.emit('shop:catalog', { shop: publicShop(), crates: publicCrates(), leaderboards: buildLeaderboards() });
 
   socket.on('auth:register', ({ username, pin, avatar } = {}, cb) => {
     const clean = cleanUsername(username);
@@ -1425,7 +1599,8 @@ io.on('connection', socket => {
     db.users[key] = user;
     authSessions.set(socket.id, key);
     saveDbSoon();
-    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), leaderboards: buildLeaderboards() });
+    normalizeUser(user);
+    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), crates: publicCrates(), social: publicSocial(user), leaderboards: buildLeaderboards() });
   });
 
   socket.on('auth:login', ({ username, pin } = {}, cb) => {
@@ -1437,14 +1612,16 @@ io.on('connection', socket => {
     user.updatedAt = Date.now();
     authSessions.set(socket.id, key);
     saveDbSoon();
-    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), leaderboards: buildLeaderboards() });
+    normalizeUser(user);
+    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), crates: publicCrates(), social: publicSocial(user), leaderboards: buildLeaderboards() });
   });
 
   socket.on('auth:profile', (_data = {}, cb) => {
     const key = authSessions.get(socket.id);
     const user = getUserByKey(key);
     if (!user) return cb?.({ ok: false, error: 'Belum login.' });
-    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), leaderboards: buildLeaderboards() });
+    normalizeUser(user);
+    cb?.({ ok: true, profile: publicProfile(user), shop: publicShop(), crates: publicCrates(), social: publicSocial(user), leaderboards: buildLeaderboards() });
   });
 
   socket.on('auth:avatar', ({ avatar } = {}, cb) => {
@@ -1494,6 +1671,107 @@ io.on('connection', socket => {
     for (const room of rooms.values()) for (const p of room.players.values()) if (p.accountKey === key) { applyProfileToPlayer(p); sendState(room); }
     notifyProfile(socket, key);
     cb?.({ ok: true, profile: publicProfile(user), item });
+  });
+
+
+
+  socket.on('crate:open', ({ crateId } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    const result = openCrateForUser(user, String(crateId || 'crate_moon'));
+    if (!result.ok) return cb?.(result);
+    notifyProfile(socket, key);
+    cb?.({ ok: true, ...result, crates: publicCrates(), leaderboards: buildLeaderboards() });
+  });
+
+  socket.on('social:search', ({ query } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    const q = usernameKey(query || '');
+    if (!q || q.length < 2) return cb?.({ ok: true, users: [] });
+    const users = Object.entries(db.users || {})
+      .filter(([k]) => k !== key && k.includes(q))
+      .slice(0, 12)
+      .map(([k, u]) => ({ username: u.username, avatar: u.avatar || '', online: isUserOnline(k), isFriend: !!user.friends?.[k], requested: !!user.sentFriendRequests?.[k], pending: !!user.friendRequests?.[k] }));
+    cb?.({ ok: true, users });
+  });
+
+  socket.on('social:request', ({ username } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    normalizeUser(user);
+    const targetKey = usernameKey(username);
+    const target = getUserByKey(targetKey);
+    if (!target || targetKey === key) return cb?.({ ok: false, error: 'Pemain tidak ditemukan.' });
+    normalizeUser(target);
+    if (user.friends[targetKey]) return cb?.({ ok: false, error: 'Sudah berteman.' });
+    const at = Date.now();
+    user.sentFriendRequests[targetKey] = at;
+    target.friendRequests[key] = at;
+    user.updatedAt = target.updatedAt = at;
+    saveDbSoon();
+    socialPush(targetKey); socialPush(key);
+    cb?.({ ok: true, social: publicSocial(user) });
+  });
+
+  socket.on('social:accept', ({ username } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    normalizeUser(user);
+    const otherKey = usernameKey(username);
+    const other = getUserByKey(otherKey);
+    if (!other || !user.friendRequests?.[otherKey]) return cb?.({ ok: false, error: 'Request tidak ditemukan.' });
+    normalizeUser(other);
+    const at = Date.now();
+    user.friends[otherKey] = at;
+    other.friends[key] = at;
+    delete user.friendRequests[otherKey];
+    delete other.sentFriendRequests[key];
+    user.updatedAt = other.updatedAt = at;
+    saveDbSoon();
+    socialPush(otherKey); socialPush(key);
+    cb?.({ ok: true, social: publicSocial(user) });
+  });
+
+  socket.on('social:remove', ({ username } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    const otherKey = usernameKey(username);
+    const other = getUserByKey(otherKey);
+    normalizeUser(user); normalizeUser(other);
+    delete user.friends[otherKey]; delete user.friendRequests[otherKey]; delete user.sentFriendRequests[otherKey];
+    if (other) { delete other.friends[key]; delete other.friendRequests[key]; delete other.sentFriendRequests[key]; other.updatedAt = Date.now(); }
+    user.updatedAt = Date.now();
+    saveDbSoon();
+    if (other) socialPush(otherKey); socialPush(key);
+    cb?.({ ok: true, social: publicSocial(user) });
+  });
+
+  socket.on('social:list', (_data = {}, cb) => {
+    const { user } = getAuthenticatedUser(socket);
+    if (!user) return cb?.({ ok: false, error: 'Belum login.' });
+    cb?.({ ok: true, social: publicSocial(user) });
+  });
+
+  socket.on('social:invite-room', ({ username } = {}, cb) => {
+    const { key, user } = getAuthenticatedUser(socket);
+    const ctx = getPlayerBySocket(socket.id);
+    if (!user || !ctx?.room || !ctx?.player) return cb?.({ ok: false, error: 'Kamu harus login dan berada di lobby/room.' });
+    const targetKey = usernameKey(username);
+    const target = getUserByKey(targetKey);
+    normalizeUser(user); normalizeUser(target);
+    if (!target || !user.friends?.[targetKey]) return cb?.({ ok: false, error: 'Pemain harus menjadi temanmu dulu.' });
+    const room = ctx.room;
+    room.invitedAccounts = room.invitedAccounts || new Set();
+    room.invitedAccounts.add(targetKey);
+    const invite = { id: nowId(), from: user.username, code: room.code, roomName: room.name, hasPassword: !!room.passwordHash, at: Date.now() };
+    target.roomInvites = (target.roomInvites || []).filter(x => x.code !== room.code || x.from !== user.username).slice(-20);
+    target.roomInvites.push(invite);
+    target.updatedAt = Date.now();
+    saveDbSoon(); saveRoomsSoon();
+    emitToAccount(targetKey, 'social:room-invite', invite);
+    socialPush(targetKey);
+    cb?.({ ok: true, invite });
   });
 
   socket.on('leaderboard:get', (_data = {}, cb) => cb?.({ ok: true, leaderboards: buildLeaderboards() }));
@@ -1557,7 +1835,8 @@ io.on('connection', socket => {
     const playerId = cleanClientId(clientId);
     const existing = findReconnectCandidate(room, playerId, accountKey, profile.username);
     if (existing) return reconnectPlayer(socket, room, existing, name, cb, 'join-reconnect');
-    if (!verifyRoomPassword(room, password)) return cb?.({ ok: false, error: 'Password room salah.' });
+    const invitedByFriend = room.invitedAccounts && room.invitedAccounts.has(accountKey);
+    if (!invitedByFriend && !verifyRoomPassword(room, password)) return cb?.({ ok: false, error: 'Password room salah.' });
     if ((room.players.size || 0) >= (room.maxPlayers || 16)) return cb?.({ ok: false, error: 'Room sudah penuh.' });
     if (room.phase !== 'lobby') return cb?.({ ok: false, error: 'Game sudah dimulai. Login akun yang sama lalu tekan Reconnect untuk masuk ulang.' });
 
@@ -1844,6 +2123,130 @@ io.on('connection', socket => {
   socket.on('disconnect', () => leaveCurrentRoom(socket));
 });
 
+let saveRoomsTimer = null;
+
+
+function serializeRoom(room) {
+  return {
+    code: room.code,
+    name: room.name,
+    passwordHash: room.passwordHash || null,
+    maxPlayers: room.maxPlayers || 16,
+    hostId: room.hostId,
+    phase: room.phase,
+    day: room.day || 0,
+    phaseEndsAt: room.phaseEndsAt || null,
+    autoResetAt: room.autoResetAt || null,
+    settings: room.settings,
+    players: [...room.players.values()].map(p => ({ ...p, socketId: null, connected: false, lastDisconnectAt: p.lastDisconnectAt || Date.now() })),
+    logs: room.logs || [],
+    nightActions: [...(room.nightActions || new Map()).entries()],
+    votes: [...(room.votes || new Map()).entries()],
+    mayorVotes: [...(room.mayorVotes || new Map()).entries()],
+    invitedAccounts: [...(room.invitedAccounts || new Set()).values()],
+    music: room.music || {},
+    hunterQueue: room.hunterQueue || [],
+    hunterNext: room.hunterNext || null,
+    gameOver: room.gameOver || null,
+    nightEvent: room.nightEvent || null,
+    rewardsGranted: !!room.rewardsGranted,
+    createdAt: room.createdAt || Date.now(),
+    updatedAt: room.updatedAt || Date.now(),
+    lastEmptyAt: room.lastEmptyAt || Date.now()
+  };
+}
+function hydrateRoom(raw) {
+  const room = newRoom(raw.code, raw.hostId, 'Host', { roomName: raw.name || 'Lobby Werewolf' });
+  room.passwordHash = raw.passwordHash || null;
+  room.maxPlayers = raw.maxPlayers || 16;
+  room.hostId = raw.hostId;
+  room.phase = raw.phase || 'lobby';
+  room.day = raw.day || 0;
+  room.phaseEndsAt = raw.phaseEndsAt || null;
+  room.autoResetAt = raw.autoResetAt || null;
+  room.settings = { ...room.settings, ...(raw.settings || {}) };
+  room.players = new Map((raw.players || []).map(p => [p.id, { ...p, socketId: null, connected: false, lastDisconnectAt: Date.now() }]));
+  room.logs = Array.isArray(raw.logs) ? raw.logs.slice(-100) : [];
+  room.nightActions = new Map(raw.nightActions || []);
+  room.votes = new Map(raw.votes || []);
+  room.mayorVotes = new Map(raw.mayorVotes || []);
+  room.invitedAccounts = new Set(raw.invitedAccounts || []);
+  room.voice = new Set();
+  room.music = raw.music || room.music;
+  room.hunterQueue = raw.hunterQueue || [];
+  room.hunterNext = raw.hunterNext || null;
+  room.gameOver = raw.gameOver || null;
+  room.nightEvent = raw.nightEvent || null;
+  room.rewardsGranted = !!raw.rewardsGranted;
+  room.createdAt = raw.createdAt || Date.now();
+  room.updatedAt = raw.updatedAt || Date.now();
+  room.lastEmptyAt = Date.now();
+  room.timer = null;
+  room.autoResetTimer = null;
+  return room;
+}
+function saveRoomsSoon() {
+  clearTimeout(saveRoomsTimer);
+  saveRoomsTimer = setTimeout(() => {
+    try {
+      const payload = { savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) };
+      fs.writeFileSync(ROOMS_FILE, JSON.stringify(payload, null, 2));
+    } catch (error) { console.error('[ROOMS] Gagal simpan rooms:', error.message); }
+  }, 250);
+}
+function loadPersistedRooms() {
+  try {
+    if (!fs.existsSync(ROOMS_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(ROOMS_FILE, 'utf8'));
+    const list = Array.isArray(raw.rooms) ? raw.rooms : [];
+    for (const item of list) {
+      if (!item?.code || rooms.has(item.code)) continue;
+      const room = hydrateRoom(item);
+      rooms.set(room.code, room);
+    }
+    for (const room of rooms.values()) resumeRoomTimers(room, true);
+    if (rooms.size) console.log(`[ROOMS] Loaded ${rooms.size} persisted room(s).`);
+  } catch (error) { console.error('[ROOMS] Gagal load persisted rooms:', error.message); }
+}
+function resumeRoomTimers(room, fromBoot = false) {
+  clearRoomTimer(room);
+  if (room.phase === 'lobby') { sendState(room); return; }
+  const now = Date.now();
+  const graceMs = 20000;
+  if (room.phase === 'gameOver') {
+    if (!room.autoResetAt || room.autoResetAt <= now) room.autoResetAt = now + graceMs;
+    room.autoResetTimer = setTimeout(() => { if (rooms.has(room.code) && room.phase === 'gameOver') resetRoom(room, { auto: true }); }, Math.max(1000, room.autoResetAt - now));
+    sendState(room);
+    return;
+  }
+  if (!room.phaseEndsAt || room.phaseEndsAt <= now) {
+    room.phaseEndsAt = now + graceMs;
+    room.logs.push({ id: nowId(), text: 'Server baru pulih. Timer diberi waktu 20 detik agar pemain bisa reconnect.', type: 'warn', at: now });
+  }
+  const phase = room.phase;
+  const delay = Math.max(1000, room.phaseEndsAt - Date.now());
+  room.timer = setTimeout(() => {
+    room.timer = null;
+    if (!rooms.has(room.code) || room.phase !== phase) return;
+    if (phase === 'roleReveal') return startMayorVote(room);
+    if (phase === 'mayorVote') return resolveMayorVote(room);
+    if (phase === 'night') return resolveNight(room);
+    if (phase === 'day') return startVoting(room);
+    if (phase === 'voting') return resolveVoting(room);
+    if (phase === 'hunter') {
+      room.hunterQueue.shift();
+      if (checkWin(room)) return;
+      const next = room.hunterNext || 'night';
+      if (room.hunterQueue.length) return startHunter(room, room.hunterQueue[0], next);
+      room.hunterNext = null;
+      return next === 'day' ? startDay(room) : startNight(room);
+    }
+  }, delay);
+  sendState(room);
+}
+
+loadPersistedRooms();
+
 setInterval(() => {
   const cutoff = Date.now() - 1000 * 60 * 60 * 8;
   let changedRoomList = false;
@@ -1856,8 +2259,11 @@ setInterval(() => {
       }
     }
   }
-  if (changedRoomList) emitRoomList();
+  if (changedRoomList) { emitRoomList(); saveRoomsSoon(); }
 }, 1000 * 60 * 30);
+
+process.on('SIGTERM', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
+process.on('SIGINT', () => { try { fs.writeFileSync(ROOMS_FILE, JSON.stringify({ savedAt: Date.now(), rooms: [...rooms.values()].map(serializeRoom) }, null, 2)); } catch (_) {} process.exit(0); });
 
 server.listen(PORT, HOST, () => {
   console.log(`Werewolf Online ready on port ${PORT}`);
