@@ -46,7 +46,7 @@ const els = {
   joinVoice: $('joinVoice'), muteVoice: $('muteVoice'), leaveVoice: $('leaveVoice'), voiceStatus: $('voiceStatus'), remoteAudios: $('remoteAudios'),
   resumeBox: $('resumeBox'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'), clearSessionBtn: $('clearSessionBtn'), menuBtn: $('menuBtn'), reconnectStatus: $('reconnectStatus'),
   guidePanel: $('guidePanel'), guideClose: $('guideClose'), guideHelp: $('guideHelp'),
-  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox')
+  appLoader: $('appLoader'), accountHub: $('accountHub'), authGrid: $('authGrid'), authName: $('authName'), authPin: $('authPin'), avatarInput: $('avatarInput'), registerBtn: $('registerBtn'), loginBtn: $('loginBtn'), accountStatus: $('accountStatus'), profileSummary: $('profileSummary'), profilePanel: $('profilePanel'), shopPanel: $('shopPanel'), inventoryPanel: $('inventoryPanel'), leaderboardPanel: $('leaderboardPanel'), profileTabBtn: $('profileTabBtn'), shopTabBtn: $('shopTabBtn'), invTabBtn: $('invTabBtn'), lbTabBtn: $('lbTabBtn'), gameProfileBox: $('gameProfileBox'), accountPage: $('accountPage'), accountPageTitle: $('accountPageTitle'), accountPageSub: $('accountPageSub'), accountPageContent: $('accountPageContent'), accountPageClose: $('accountPageClose')
 };
 
 const savedName = localStorage.getItem('werewolfName');
@@ -569,14 +569,25 @@ function isWolf(role) { return role === 'Werewolf' || role === 'Alpha Werewolf';
 
 function showCinematic(a) {
   const map = {
-    roleReveal:'🎭', mayor:'👑', nightRole:'🌙', attack:'🐺', death:'💀', saved:'✨', seer:'🔮', heal:'💉', guard:'🛡️', poison:'🧪', vote:'🗳️', execution:'⚖️', hunter:'🏹', hunterShot:'🏹', victory:'🏆', defeat:'🌑', wolfWin:'🐺', villageWin:'🌅', jesterWin:'🃏', blocked:'⛔', cursed:'🌘', prince:'👑', bless:'⛪'
+    roleReveal:'🎭', mayor:'👑', nightRole:'🌙', attack:'🐺', death:'💀', saved:'✨', seer:'🔮', heal:'💉', guard:'🛡️', poison:'🧪', vote:'🗳️', execution:'⚖️', hunter:'🏹', hunterShot:'🏹', victory:'🏆', defeat:'🌑', wolfWin:'🐺', villageWin:'🌅', jesterWin:'🃏', blocked:'⛔', cursed:'🌘', prince:'👑', bless:'⛪', powerItem:'⚡'
   };
+  const card = els.cinematic?.querySelector('.cinematic-card');
+  if (card) {
+    card.className = `cinematic-card scene-${String(a.type || 'event').replace(/[^a-zA-Z0-9_-]/g,'')}`;
+    let scene = card.querySelector('.cinematic-3d-scene');
+    if (!scene) {
+      scene = document.createElement('div');
+      scene.className = 'cinematic-3d-scene';
+      card.insertBefore(scene, card.firstChild);
+    }
+    scene.innerHTML = `<span class="scene-moon"></span><span class="scene-shadow"></span><span class="scene-actor">${map[a.type] || '🐺'}</span><span class="scene-target">${a.type === 'attack' ? '🧑' : a.type === 'seer' ? '👁️' : a.type === 'heal' ? '💚' : a.type === 'death' ? '⚰️' : '✨'}</span><span class="scene-particles"></span>`;
+  }
   els.cinematicIcon.textContent = map[a.type] || '🐺';
   els.cinematicTitle.textContent = a.title || 'Event';
   els.cinematicText.textContent = a.text || '';
   els.cinematicTitle.className = a.aura || '';
   els.cinematic.classList.remove('hidden');
-  const duration = ['roleReveal','victory','defeat','wolfWin','villageWin','jesterWin'].includes(a.type) ? 4200 : 2500;
+  const duration = ['roleReveal','victory','defeat','wolfWin','villageWin','jesterWin','attack','death','seer','heal','guard','hunterShot'].includes(a.type) ? 4600 : 2800;
   clearTimeout(showCinematic.t);
   showCinematic.t = setTimeout(() => els.cinematic.classList.add('hidden'), duration);
   toast(a.title || 'Event', a.text || '');
@@ -669,28 +680,67 @@ els.loginBtn?.addEventListener('click', () => {
   });
 });
 
-for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => { activeHubTab = tab; renderAccountHub(); });
+for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.addEventListener('click', () => openAccountPage(tab));
+els.accountPageClose?.addEventListener('click', closeAccountPage);
 
 function renderAccountHub() {
   if (!els.accountStatus) return;
   const p = accountProfile;
+  els.accountHub?.classList.toggle('logged-in', !!p);
   els.accountStatus.textContent = p ? `Login: ${p.username}` : 'Belum login';
   if (p) {
     els.nameInput.value = p.username;
     els.nameInput.disabled = true;
+    els.authName.value = p.username;
+    els.authPin.value = '';
     els.profileSummary?.classList.remove('hidden');
     const s = p.stats || {};
     const eq = p.equipped || {};
-    els.profileSummary.innerHTML = `<img class="profile-avatar ${escapeHtml(frameClass(eq.frame))}" src="${escapeHtml(p.avatar)}" alt="avatar"><div><div class="profile-name">${escapeHtml(p.username)} • ${p.points || 0} poin</div><div class="profile-stats"><span class="pill">🏆 ${s.wins || 0} Win</span><span class="pill">🎮 ${s.games || 0} Main</span><span class="pill">🐺 ${s.teamWins?.werewolf || 0} Wolf Win</span><span class="pill">🏡 ${s.teamWins?.village || 0} Village Win</span><span class="pill">🔥 Streak ${s.winStreak || 0}</span></div><div class="power-note">Equip: ${eq.skin ? itemName(eq.skin) : 'No skin'} • ${eq.frame ? itemName(eq.frame) : 'No frame'} • ${eq.badge ? itemName(eq.badge) : 'No badge'} • ${eq.power ? itemName(eq.power) : 'No power'}</div></div>`;
+    els.profileSummary.innerHTML = `<img class="profile-avatar ${escapeHtml(frameClass(eq.frame))}" src="${escapeHtml(p.avatar)}" alt="avatar"><div><div class="profile-name">${escapeHtml(p.username)} ${p.isAdmin ? '<span class="owner-chip">OWNER</span>' : ''} • ${escapeHtml(pointsText(p))} poin</div><div class="profile-stats"><span class="pill">🏆 ${s.wins || 0} Win</span><span class="pill">🎮 ${s.games || 0} Main</span><span class="pill">🐺 ${s.teamWins?.werewolf || 0} Wolf Win</span><span class="pill">🏡 ${s.teamWins?.village || 0} Village Win</span><span class="pill">🔥 Streak ${s.winStreak || 0}</span></div><div class="power-note">Equip: ${eq.skin ? itemName(eq.skin) : 'No skin'} • ${eq.frame ? itemName(eq.frame) : 'No frame'} • ${eq.badge ? itemName(eq.badge) : 'No badge'} • ${eq.power ? itemName(eq.power) : 'No power'} ${eq.power ? `• Stok ${accountProfile.inventory?.[eq.power] || 0}` : ''}</div></div>`;
   } else {
     els.nameInput.disabled = false;
     els.profileSummary?.classList.add('hidden');
   }
-  for (const [btn, tab] of [[els.profileTabBtn,'profile'],[els.shopTabBtn,'shop'],[els.invTabBtn,'inv'],[els.lbTabBtn,'lb']]) btn?.classList.toggle('active', activeHubTab === tab);
-  els.shopPanel?.classList.toggle('hidden', activeHubTab !== 'shop');
-  els.inventoryPanel?.classList.toggle('hidden', activeHubTab !== 'inv');
-  els.leaderboardPanel?.classList.toggle('hidden', activeHubTab !== 'lb');
   renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard(); renderGameProfileBox();
+  if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage();
+}
+
+function openAccountPage(tab = 'profile') {
+  if (!accountProfile && tab !== 'profile') return toast('Login dulu', 'Daftar atau login untuk membuka halaman ini.');
+  activeHubTab = tab;
+  refreshAccountPage();
+  els.accountPage?.classList.remove('hidden');
+}
+function closeAccountPage() { els.accountPage?.classList.add('hidden'); }
+function refreshAccountPage() {
+  const titles = {
+    profile: ['Profil Pemain', 'Statistik, foto profil, badge, frame, dan equip aktif.'],
+    shop: ['Shop', 'Beli skin permanen dan power item sekali pakai. Power bisa dibeli berkali-kali.'],
+    inv: ['Inventory', 'Lihat stok item, equip skin/badge/frame, dan pilih power item yang akan dipakai.'],
+    lb: ['Leaderboard Top 100', 'Peringkat berdasarkan poin, kemenangan, team Werewolf, dan team Village.']
+  };
+  renderProfilePanel(); renderShop(); renderInventory(); renderLeaderboard();
+  const [title, sub] = titles[activeHubTab] || titles.profile;
+  if (els.accountPageTitle) els.accountPageTitle.textContent = title;
+  if (els.accountPageSub) els.accountPageSub.textContent = sub;
+  const source = activeHubTab === 'shop' ? els.shopPanel : activeHubTab === 'inv' ? els.inventoryPanel : activeHubTab === 'lb' ? els.leaderboardPanel : els.profilePanel;
+  if (els.accountPageContent && source) els.accountPageContent.innerHTML = source.innerHTML;
+  attachCopiedProfileAvatarHandler();
+}
+function attachCopiedProfileAvatarHandler() {
+  const input = els.accountPageContent?.querySelector('#profileAvatarInput');
+  input?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 350000) return toast('Foto terlalu besar', 'Gunakan gambar kecil di bawah 350 KB.');
+    const avatar = await fileToDataUrl(file);
+    socket.emit('auth:avatar', { avatar }, (res) => {
+      if (!res?.ok) return toast('Upload gagal', res?.error || 'Coba gambar lain.');
+      accountProfile = res.profile;
+      renderAccountHub();
+      toast('Avatar disimpan', 'Foto profil berhasil diperbarui.');
+    });
+  });
 }
 
 
@@ -743,22 +793,34 @@ function renderProfilePanel() {
 
 function renderShop() {
   if (!els.shopPanel) return;
+  if (!accountProfile) { els.shopPanel.innerHTML = '<div class="mini-note">Login dulu untuk membuka Shop.</div>'; return; }
   if (!shopCatalog.length) { els.shopPanel.innerHTML = '<div class="mini-note">Shop belum dimuat.</div>'; return; }
-  const points = accountProfile?.points || 0;
+  const points = accountProfile?.isAdmin ? Infinity : Number(accountProfile?.points || 0);
   els.shopPanel.innerHTML = `<div class="shop-grid">${shopCatalog.map(item => {
-    const owned = !!accountProfile?.inventory?.[item.id];
+    const count = Number(accountProfile?.inventory?.[item.id] || 0);
+    const owned = count > 0;
     const equipped = accountProfile?.equipped?.[item.type] === item.id;
-    return `<div class="shop-item ${item.type}"><div class="shop-top"><div><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div><span class="badge">${item.type}</span></div><div class="shop-actions"><span class="price">${item.price} poin</span>${owned ? (equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`) : `<button class="btn primary small" ${points < item.price ? 'disabled' : ''} onclick="buyItem('${item.id}')">Beli</button>`}</div></div>`;
-  }).join('')}</div>`;
+    const isPower = item.type === 'power';
+    const buyText = isPower ? 'Beli +1' : 'Beli';
+    const status = isPower ? `<span class="owned">Stok x${count}</span>` : (owned ? '<span class="owned">Dimiliki</span>' : '');
+    const equipBtn = owned ? (equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`) : '';
+    const buyBtn = (isPower || !owned) ? `<button class="btn primary small" ${points < item.price ? 'disabled' : ''} onclick="buyItem('${item.id}')">${buyText}</button>` : '';
+    return `<div class="shop-item ${item.type}"><div class="shop-top"><div><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div></div><span class="badge">${isPower ? 'sekali pakai' : item.type}</span></div><div class="shop-actions"><span class="price">${item.price} poin</span><div class="item-stack">${status}${equipBtn}${buyBtn}</div></div></div>`;
+  }).join('')}</div><div class="mini-note">Power item bersifat konsumsi: beli 1 = stok 1. Saat efeknya dipakai di game, stok berkurang 1. Dalam satu game satu power hanya bisa aktif satu kali.</div>`;
 }
 function renderInventory() {
   if (!els.inventoryPanel) return;
   const inv = accountProfile?.inventory || {};
-  const owned = shopCatalog.filter(x => inv[x.id]);
+  const owned = shopCatalog.filter(x => Number(inv[x.id] || 0) > 0);
   if (!accountProfile) { els.inventoryPanel.innerHTML = '<div class="mini-note">Login dulu untuk melihat inventory.</div>'; return; }
   if (!owned.length) { els.inventoryPanel.innerHTML = '<div class="mini-note">Inventory kosong. Beli item di Shop.</div>'; return; }
-  els.inventoryPanel.innerHTML = `<div class="shop-grid">${owned.map(item => `<div class="shop-item ${item.type}"><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div><div class="shop-actions"><span class="owned">Dimiliki</span><button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button></div></div>`).join('')}</div>`;
+  els.inventoryPanel.innerHTML = `<div class="shop-grid">${owned.map(item => {
+    const count = Number(inv[item.id] || 0);
+    const equipped = accountProfile?.equipped?.[item.type] === item.id;
+    return `<div class="shop-item ${item.type}"><div class="shop-name">${item.emoji} ${escapeHtml(item.name)}</div><div class="shop-desc">${escapeHtml(item.desc)}</div><div class="shop-actions"><span class="owned">${item.type === 'power' ? `Stok x${count}` : 'Dimiliki'}</span>${equipped ? '<span class="equip-now">Dipakai</span>' : `<button class="btn secondary small" onclick="equipItem('${item.id}')">Equip</button>`}</div></div>`;
+  }).join('')}</div><div class="mini-note">Equip power menentukan item yang siap dipakai. Stok power akan berkurang setelah efeknya benar-benar aktif di game.</div>`;
 }
+
 function renderLeaderboard() {
   if (!els.leaderboardPanel) return;
   if (!latestLeaderboards) { els.leaderboardPanel.innerHTML = '<div class="mini-note">Leaderboard belum dimuat.</div>'; return; }
@@ -766,16 +828,16 @@ function renderLeaderboard() {
   const list = latestLeaderboards[activeLbTab] || [];
   els.leaderboardPanel.innerHTML = `<div class="leader-tabs">${tabs.map(([id,label]) => `<button onclick="setLbTab('${id}')" class="${activeLbTab===id?'active':''}">${label}</button>`).join('')}</div>${list.slice(0,100).map((u,i) => `<div class="leader-row"><div class="rank">#${i+1}</div><div><div class="leader-name">${escapeHtml(u.username)}</div><div class="leader-meta">Win ${u.stats?.wins || 0} • Main ${u.stats?.games || 0} • Wolf ${u.stats?.teamWins?.werewolf || 0} • Village ${u.stats?.teamWins?.village || 0}</div></div><b>${u.points || 0}</b></div>`).join('')}`;
 }
-window.setLbTab = (id) => { activeLbTab = id; renderLeaderboard(); };
-window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); toast('Item dibeli', `${res.item?.name || itemId} masuk inventory.`); });
-window.equipItem = (itemId) => socket.emit('shop:equip', { itemId }, (res) => { if (!res?.ok) return toast('Gagal equip', res?.error || 'Belum dimiliki.'); accountProfile = res.profile; renderAccountHub(); toast('Item dipakai', `${res.item?.name || itemId} sekarang aktif.`); });
+window.setLbTab = (id) => { activeLbTab = id; renderLeaderboard(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); };
+window.buyItem = (itemId) => socket.emit('shop:buy', { itemId }, (res) => { if (!res?.ok) return toast('Gagal beli', res?.error || 'Poin belum cukup.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dibeli', `${res.item?.name || itemId} masuk inventory.`); });
+window.equipItem = (itemId) => socket.emit('shop:equip', { itemId }, (res) => { if (!res?.ok) return toast('Gagal equip', res?.error || 'Belum dimiliki.'); accountProfile = res.profile; renderAccountHub(); if (els.accountPage && !els.accountPage.classList.contains('hidden')) refreshAccountPage(); toast('Item dipakai', `${res.item?.name || itemId} sekarang aktif.`); });
 
 function renderGameProfileBox() {
   if (!els.gameProfileBox) return;
   if (!accountProfile) { els.gameProfileBox.classList.add('hidden'); return; }
   const eq = accountProfile.equipped || {};
   els.gameProfileBox.classList.remove('hidden');
-  els.gameProfileBox.innerHTML = `<b>👤 ${escapeHtml(accountProfile.username)}</b><div class="mini-note">${accountProfile.points || 0} poin • ${eq.power ? '⚡ '+escapeHtml(itemName(eq.power)) : 'Power belum dipakai'}</div>`;
+  els.gameProfileBox.innerHTML = `<b>👤 ${escapeHtml(accountProfile.username)}</b><div class="mini-note">${pointsText(accountProfile)} poin • ${eq.power ? '⚡ '+escapeHtml(itemName(eq.power)) : 'Power belum dipakai'}</div>`;
 }
 renderAccountHub();
 

@@ -1,29 +1,27 @@
-# Werewolf by Ryuu v3.1 — Profile Pages, Stable Reconnect, Owner Account
+# Werewolf by Ryuu v3.2 Final
 
-Versi final upgrade dengan fokus pada UI profil yang lebih rapi, reconnect yang lebih stabil, dan akun owner khusus.
+Versi final ini berisi update sesuai permintaan:
 
-## Fitur utama
+- Login/register hilang setelah pemain login.
+- Menu akun berubah menjadi profil pemain ringkas.
+- Shop, Inventory, Profil lengkap, dan Leaderboard dibuka sebagai halaman terpisah, bukan menumpuk di menu utama.
+- Power item menjadi item konsumsi: beli 1 = stok 1, beli 2 = stok 2.
+- Power item hanya aktif satu kali dalam game/situasi yang sesuai, lalu stok berkurang 1.
+- Skin, badge, frame, inventory, statistik, leaderboard, dan shop tetap aktif.
+- Cinematic role/aksi dibuat lebih keren dengan animasi 3D-style CSS: Werewolf memangsa, Seer vision, heal, death, victory, dan power item.
+- Owner account tetap ada:
+  - Username: ryuu
+  - PIN: 291206
+  - Poin: unlimited
+- Cocok untuk Railway dengan volume `/app/data` agar data pemain tidak hilang.
 
-- Login & daftar memakai username unik + PIN.
-- Username yang sudah dipakai tidak bisa didaftarkan lagi.
-- Setelah login, kotak login/daftar otomatis hilang dan berubah menjadi profil pemain.
-- Halaman/tab terpisah: Profil, Shop, Inventory, Leaderboard.
-- Profil pemain dengan upload foto sendiri.
-- Badge, skin, frame/border foto, inventory, equip item.
-- Sistem poin setelah game selesai.
-- Akun owner khusus: `ryuu` dengan PIN `291206` dan poin unlimited.
-- Leaderboard Top 100: poin, overall, team Werewolf, team Village, Seer, Doctor.
-- Power item: Seer 2x scan, Werewolf 2 target, vote 3 suara, Doctor 2 protect, Bodyguard 2 guard, Witch 2 ramuan/malam, Lucky Charm, Shadow Cloak.
-- Statistik menang/kalah, role win, team win, kill, scan, protect, vote.
-- Loading screen ringan saat masuk agar tampilan tidak kosong.
-- Reconnect lebih stabil: timer game tidak freeze saat host/player disconnect, host tetap host saat reconnect.
-- Room list, password lobby, musik bersama, YouTube search, voice, Kades x2, auto reset.
+## Upload ke GitHub
 
-## Deploy Railway
+Upload isi folder ini ke root repo, bukan foldernya sebagai subfolder.
 
-Struktur repo:
+Struktur yang benar:
 
-```txt
+```text
 werewolf-by-ryuu/
 ├── public/
 │   ├── index.html
@@ -36,28 +34,10 @@ werewolf-by-ryuu/
 └── server.js
 ```
 
-Railway akan memakai Dockerfile Node 22. Setelah push ke GitHub, Railway redeploy otomatis.
+## Railway Volume
 
-## Penting untuk data akun permanen
+Agar akun, PIN, poin, statistik, inventory, dan foto profil tidak hilang, pasang Railway Volume:
 
-Database pemain disimpan di:
-
-```txt
-data/players.json
+```text
+Mount path: /app/data
 ```
-
-Agar poin, akun, skin, inventory, foto profil, dan leaderboard tidak hilang, tambahkan Railway Volume dan mount ke:
-
-```txt
-/app/data
-```
-
-## Cara main fitur akun
-
-1. Daftar/Login pakai username + PIN.
-2. Setelah login, panel berubah menjadi Profil.
-3. Buka Shop untuk membeli skin/item.
-4. Buka Inventory untuk equip skin/frame/badge/power.
-5. Buka Leaderboard untuk melihat Top 100.
-6. Buat room atau join lobby publik.
-7. Setelah game selesai, poin dan statistik otomatis masuk.

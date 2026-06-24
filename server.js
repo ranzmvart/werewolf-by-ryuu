@@ -36,14 +36,14 @@ const SHOP_ITEMS = [
   { id: 'badge_founder', type: 'badge', emoji: '⭐', name: 'Founder Badge', price: 500, desc: 'Badge pendiri awal Ryuu Village.' },
   { id: 'badge_wolf_hunter', type: 'badge', emoji: '🏹', name: 'Wolf Hunter', price: 800, desc: 'Badge pemburu werewolf.' },
   { id: 'badge_mastermind', type: 'badge', emoji: '🧠', name: 'Mastermind', price: 1000, desc: 'Badge pemain strategi.' },
-  { id: 'power_seer_double', type: 'power', emoji: '🔮', name: 'Double Vision Lens', price: 2200, desc: 'Jika kamu Seer, bisa menerawang 2 pemain per malam.' },
-  { id: 'power_wolf_double', type: 'power', emoji: '🐺', name: 'Double Fang', price: 2600, desc: 'Jika kamu Werewolf, tim bisa menyerang hingga 2 target pada malam itu.' },
-  { id: 'power_vote_triple', type: 'power', emoji: '🗳️', name: 'Royal Ballot', price: 2000, desc: 'Vote eliminasi kamu bernilai 3 suara.' },
-  { id: 'power_doctor_double', type: 'power', emoji: '💉', name: 'Emergency Kit', price: 2100, desc: 'Jika kamu Doctor, bisa melindungi 2 target per malam.' },
-  { id: 'power_bodyguard_double', type: 'power', emoji: '🛡️', name: 'Twin Guard Oath', price: 1900, desc: 'Jika kamu Bodyguard, bisa menjaga 2 target per malam.' },
-  { id: 'power_witch_dual', type: 'power', emoji: '🧪', name: 'Dual Vial Belt', price: 2300, desc: 'Jika kamu Witch, bisa memakai heal dan poison pada malam yang sama.' },
-  { id: 'power_lucky_charm', type: 'power', emoji: '🍀', name: 'Lucky Charm', price: 2400, desc: 'Sekali per game, kamu bisa selamat dari serangan malam.' },
-  { id: 'power_shadow_cloak', type: 'power', emoji: '🌑', name: 'Shadow Cloak', price: 2500, desc: 'Sekali per game, hasil terawangan Seer terhadapmu tersamarkan sebagai Village.' }
+  { id: 'power_seer_double', type: 'power', emoji: '🔮', name: 'Double Vision Lens', price: 2200, desc: 'Sekali pakai: jika kamu Seer, bisa menerawang 2 pemain pada satu malam.' },
+  { id: 'power_wolf_double', type: 'power', emoji: '🐺', name: 'Double Fang', price: 2600, desc: 'Sekali pakai: jika kamu Werewolf, tim bisa menyerang hingga 2 target pada satu malam.' },
+  { id: 'power_vote_triple', type: 'power', emoji: '🗳️', name: 'Royal Ballot', price: 2000, desc: 'Sekali pakai: vote eliminasi kamu pada satu hari bernilai 3 suara.' },
+  { id: 'power_doctor_double', type: 'power', emoji: '💉', name: 'Emergency Kit', price: 2100, desc: 'Sekali pakai: jika kamu Doctor, bisa melindungi 2 target pada satu malam.' },
+  { id: 'power_bodyguard_double', type: 'power', emoji: '🛡️', name: 'Twin Guard Oath', price: 1900, desc: 'Sekali pakai: jika kamu Bodyguard, bisa menjaga 2 target pada satu malam.' },
+  { id: 'power_witch_dual', type: 'power', emoji: '🧪', name: 'Dual Vial Belt', price: 2300, desc: 'Sekali pakai: jika kamu Witch, bisa memakai heal dan poison pada malam yang sama.' },
+  { id: 'power_lucky_charm', type: 'power', emoji: '🍀', name: 'Lucky Charm', price: 2400, desc: 'Sekali pakai: kamu bisa selamat dari satu serangan malam.' },
+  { id: 'power_shadow_cloak', type: 'power', emoji: '🌑', name: 'Shadow Cloak', price: 2500, desc: 'Sekali pakai: hasil terawangan Seer terhadapmu tersamarkan sebagai Village.' }
 ];
 const SHOP_BY_ID = new Map(SHOP_ITEMS.map(item => [item.id, item]));
 const authSessions = new Map(); // socket.id -> usernameKey
@@ -111,7 +111,7 @@ function ensureAdminUser() {
     existing.isAdmin = true;
     existing.points = ADMIN_POINTS;
     existing.inventory = existing.inventory || {};
-    for (const item of SHOP_ITEMS) existing.inventory[item.id] = 1;
+    for (const item of SHOP_ITEMS) existing.inventory[item.id] = item.type === 'power' ? 99 : 1;
     existing.equipped = existing.equipped || { skin: null, frame: null, badge: null, power: null };
     existing.updatedAt = Date.now();
     // Reset the PIN to the requested owner PIN so the owner account is always recoverable.
@@ -120,7 +120,7 @@ function ensureAdminUser() {
     const admin = createUser(ADMIN_USERNAME, ADMIN_PIN, '');
     admin.isAdmin = true;
     admin.points = ADMIN_POINTS;
-    for (const item of SHOP_ITEMS) admin.inventory[item.id] = 1;
+    for (const item of SHOP_ITEMS) admin.inventory[item.id] = item.type === 'power' ? 99 : 1;
     admin.equipped = { skin: 'skin_blood_moon', frame: 'frame_gold', badge: 'badge_founder', power: 'power_vote_triple' };
     db.users[key] = admin;
   }
@@ -137,6 +137,9 @@ function sanitizeAvatar(data) {
 function getUserByKey(key) { return db.users[String(key || '').toLowerCase()] || null; }
 function publicProfile(user) {
   if (!user) return null;
+  user.inventory = user.inventory || {};
+  user.equipped = user.equipped || {};
+  validateEquippedPower(user);
   const inv = user.inventory || {};
   return {
     username: user.username,
@@ -151,10 +154,48 @@ function publicProfile(user) {
   };
 }
 function publicShop() { return SHOP_ITEMS; }
+function isPowerItem(itemId) { return SHOP_BY_ID.get(String(itemId || ''))?.type === 'power'; }
 function hasOwned(user, itemId) { return Number(user?.inventory?.[itemId] || 0) > 0; }
+function getItemCount(user, itemId) { return Number(user?.inventory?.[itemId] || 0); }
 function equippedItem(user, type) { return user?.equipped?.[type] || null; }
-function hasPower(player, id) { return player?.power === id || player?.equipped?.power === id; }
 function profileForAccount(accountKey) { return accountKey ? getUserByKey(accountKey) : null; }
+function hasPower(player, id) { return hasActivePower(player, id); }
+function hasActivePower(player, id) {
+  if (!player || player.powerConsumed || player.power !== id) return false;
+  const user = profileForAccount(player.accountKey);
+  if (!user) return false;
+  return !!user.isAdmin || getItemCount(user, id) > 0;
+}
+function validateEquippedPower(user) {
+  if (!user?.equipped?.power) return;
+  if (!SHOP_BY_ID.has(user.equipped.power) || !hasOwned(user, user.equipped.power)) user.equipped.power = null;
+}
+function consumePowerItem(player, id, room, label = 'Power Item') {
+  if (!hasActivePower(player, id)) return false;
+  const user = profileForAccount(player.accountKey);
+  if (!user) return false;
+  if (!user.isAdmin) {
+    user.inventory[id] = Math.max(0, Number(user.inventory?.[id] || 0) - 1);
+    if (user.inventory[id] <= 0) {
+      delete user.inventory[id];
+      if (user.equipped?.power === id) user.equipped.power = null;
+    }
+  }
+  player.powerConsumed = true;
+  player.power = null;
+  player.consumedPowerId = id;
+  user.updatedAt = Date.now();
+  saveDbSoon();
+  notifyProfile(player.socketId || player.id, player.accountKey);
+  personalAnim(player.id, 'powerItem', 'Item Terpakai', `${label} dipakai dan stoknya berkurang 1.`, { aura: 'amber' });
+  if (room) addLog(room, `${player.name} memakai item ${SHOP_BY_ID.get(id)?.name || id}.`, 'power');
+  return true;
+}
+function canEquipPower(user, itemId) {
+  const item = SHOP_BY_ID.get(String(itemId || ''));
+  if (!item || item.type !== 'power') return false;
+  return !!user?.isAdmin || Number(user?.inventory?.[itemId] || 0) > 0;
+}
 function applyProfileToPlayer(p) {
   const user = profileForAccount(p.accountKey);
   if (!user) return;
@@ -163,7 +204,11 @@ function applyProfileToPlayer(p) {
   p.skin = user.equipped?.skin || null;
   p.frame = user.equipped?.frame || null;
   p.badge = user.equipped?.badge || null;
-  p.power = user.equipped?.power || null;
+  validateEquippedPower(user);
+  // Jangan reset konsumsi power di tengah game. Power hanya di-refresh penuh saat start game baru.
+  if (!p.role || !p.powerConsumed) p.power = user.equipped?.power || null;
+  if (typeof p.powerConsumed === 'undefined') p.powerConsumed = false;
+  if (typeof p.consumedPowerId === 'undefined') p.consumedPowerId = null;
 }
 function notifyProfile(socketOrId, key) {
   const user = getUserByKey(key);
@@ -206,7 +251,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.1.0-profile-pages-stable-reconnect-admin' }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'werewolf-by-ryuu', version: '3.2.0-pages-consumable-power-3d' }));
 
 app.get('/api/music/youtube', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 120);
@@ -550,7 +595,7 @@ function privateState(room, id) {
     equippedPower: p.power || null,
     remainingActions: remainingNightActions(room, p),
     actionLimits: getActionLimits(room, p),
-    voteWeight: voteWeight(p)
+    voteWeight: voteWeight(p, room)
   };
 }
 
@@ -684,6 +729,10 @@ function startGame(room) {
     p.roundStats = defaultRoundStats();
     p.powerUsedLucky = false;
     p.powerUsedCloak = false;
+    p.powerConsumed = false;
+    p.consumedPowerId = null;
+    p.powerVoteDay = null;
+    p.wolfDoubleDay = null;
     applyProfileToPlayer(p);
   }
   room.nightEvent = null;
@@ -757,7 +806,7 @@ function hasActorTargeted(room, actorId, type, targetId) {
 function getActionLimits(room, p) {
   if (!p?.alive || room.phase !== 'night') return {};
   const limits = {};
-  if (['Werewolf','Alpha Werewolf','Sorcerer'].includes(p.role)) limits.kill = hasPower(p, 'power_wolf_double') ? 2 : 1;
+  if (['Werewolf','Alpha Werewolf','Sorcerer'].includes(p.role)) limits.kill = (hasPower(p, 'power_wolf_double') || p.wolfDoubleDay === room.day) ? 2 : 1;
   if (p.role === 'Seer') limits.scan = hasPower(p, 'power_seer_double') ? 2 : 1;
   if (p.role === 'Doctor') limits.protect = hasPower(p, 'power_doctor_double') ? 2 : 1;
   if (p.role === 'Bodyguard') limits.guard = hasPower(p, 'power_bodyguard_double') ? 2 : 1;
@@ -805,8 +854,9 @@ function actionNeeded(p, room = null) {
 
 function scanResultFor(room, seer, target) {
   const meta = ROLE_META[target.role] || { team: 'unknown' };
-  if (hasPower(target, 'power_shadow_cloak') && !target.powerUsedCloak) {
+  if (hasActivePower(target, 'power_shadow_cloak') && !target.powerUsedCloak) {
     target.powerUsedCloak = true;
+    consumePowerItem(target, 'power_shadow_cloak', room, 'Shadow Cloak');
     return `${target.name} terlihat berada di sisi Village. Aura gelap menutupi kebenaran.`;
   }
   if (target.role === 'Lycan') return `${target.name} terlihat seperti Werewolf karena kutukan Lycan.`;
@@ -829,6 +879,10 @@ function submitNightAction(room, socket, data) {
     if (!target || !target.alive || target.id === p.id || ROLE_META[target.role]?.team === 'werewolf') return rejectNightAction(p, 'Target Tidak Valid', 'Werewolf tidak bisa menarget diri sendiri atau sesama tim Werewolf.');
     const check = canUseAction(room, p, 'kill', target.id);
     if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+    if (hasActivePower(p, 'power_wolf_double')) {
+      consumePowerItem(p, 'power_wolf_double', room, 'Double Fang');
+      p.wolfDoubleDay = room.day;
+    }
     room.nightActions.set(`${p.id}:kill:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'kill', target: target.id });
     p.roundStats.killsAttempted += 1;
     personalAnim(p.id, 'attack', 'Target Terkunci', `${target.name} menjadi target seranganmu malam ini.`, { aura: 'blood' });
@@ -838,6 +892,7 @@ function submitNightAction(room, socket, data) {
     if (!target || !target.alive || target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Seer harus menerawang pemain lain yang masih hidup.');
     const check = canUseAction(room, p, 'scan', target.id);
     if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+    if (countActorActions(room, p.id, 'scan') >= 1) consumePowerItem(p, 'power_seer_double', room, 'Double Vision Lens');
     room.nightActions.set(`${p.id}:scan:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'scan', target: target.id });
     p.roundStats.scans += 1;
     p.lastInfo = scanResultFor(room, p, target);
@@ -847,6 +902,7 @@ function submitNightAction(room, socket, data) {
     if (!target || !target.alive) return rejectNightAction(p, 'Target Tidak Valid', 'Doctor hanya bisa melindungi pemain hidup.');
     const check = canUseAction(room, p, 'protect', target.id);
     if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+    if (countActorActions(room, p.id, 'protect') >= 1) consumePowerItem(p, 'power_doctor_double', room, 'Emergency Kit');
     room.nightActions.set(`${p.id}:protect:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'protect', target: target.id });
     p.roundStats.protects += 1;
     personalAnim(p.id, 'heal', 'Perlindungan Terkunci', `${target.name} kamu lindungi malam ini.`, { aura: 'green' });
@@ -855,6 +911,7 @@ function submitNightAction(room, socket, data) {
     if (!target || !target.alive || target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Bodyguard harus menjaga pemain lain yang masih hidup.');
     const check = canUseAction(room, p, 'guard', target.id);
     if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+    if (countActorActions(room, p.id, 'guard') >= 1) consumePowerItem(p, 'power_bodyguard_double', room, 'Twin Guard Oath');
     room.nightActions.set(`${p.id}:guard:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'guard', target: target.id });
     p.roundStats.protects += 1;
     personalAnim(p.id, 'guard', 'Penjagaan Terkunci', `Kamu berjaga di dekat ${target.name}.`, { aura: 'blue' });
@@ -874,6 +931,7 @@ function submitNightAction(room, socket, data) {
       if (p.witchHealUsed) return rejectNightAction(p, 'Ramuan Heal Habis', 'Ramuan heal hanya bisa dipakai satu kali per game.');
       const check = canUseAction(room, p, 'witchHeal', target.id);
       if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+      if (countActorActions(room, p.id) >= 1) consumePowerItem(p, 'power_witch_dual', room, 'Dual Vial Belt');
       room.nightActions.set(`${p.id}:witchHeal:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'witchHeal', target: target.id });
       p.witchHealUsed = true;
       p.roundStats.protects += 1;
@@ -883,6 +941,7 @@ function submitNightAction(room, socket, data) {
       if (target.id === p.id) return rejectNightAction(p, 'Target Tidak Valid', 'Witch tidak bisa poison diri sendiri.');
       const check = canUseAction(room, p, 'witchPoison', target.id);
       if (!check.ok) return rejectNightAction(p, 'Aksi Ditolak', check.reason);
+      if (countActorActions(room, p.id) >= 1) consumePowerItem(p, 'power_witch_dual', room, 'Dual Vial Belt');
       room.nightActions.set(`${p.id}:witchPoison:${target.id}:${nowId()}`, { actor: p.id, role: p.role, type: 'witchPoison', target: target.id });
       p.witchPoisonUsed = true;
       personalAnim(p.id, 'poison', 'Ramuan Poison Terkunci', `${target.name} terkena kutukan racun.`, { aura: 'green' });
@@ -910,7 +969,7 @@ function resolveNight(room) {
   const actions = [...room.nightActions.values()];
   const killCounts = new Map();
   for (const a of actions.filter(a => a.type === 'kill')) killCounts.set(a.target, (killCounts.get(a.target) || 0) + (a.role === 'Alpha Werewolf' ? 2 : 1));
-  const maxWolfTargets = alivePlayers(room).some(p => ROLE_META[p.role]?.team === 'werewolf' && hasPower(p, 'power_wolf_double')) ? 2 : 1;
+  const maxWolfTargets = alivePlayers(room).some(p => ROLE_META[p.role]?.team === 'werewolf' && (hasActivePower(p, 'power_wolf_double') || p.wolfDoubleDay === room.day)) ? 2 : 1;
   const wolfTargetIds = [...killCounts.entries()].sort((a,b)=>b[1]-a[1]).slice(0, maxWolfTargets).map(([id]) => id);
 
   const doctorProtected = new Set(actions.filter(a => a.type === 'protect').map(a => a.target));
@@ -1004,9 +1063,9 @@ function startVoting(room) {
   setPhase(room, 'voting', room.settings.voteSec, () => resolveVoting(room));
 }
 
-function voteWeight(player) {
+function voteWeight(player, room = null) {
   if (!player) return 1;
-  if (hasPower(player, 'power_vote_triple')) return 3;
+  if (room && player.powerVoteDay === room.day) return 3;
   return player.isMayor ? 2 : 1;
 }
 
@@ -1016,7 +1075,7 @@ function getVoteState(room) {
     const voter = room.players.get(voterId);
     const target = room.players.get(targetId);
     if (!voter?.alive || !target?.alive) continue;
-    counts[targetId] = (counts[targetId] || 0) + voteWeight(voter);
+    counts[targetId] = (counts[targetId] || 0) + voteWeight(voter, room);
   }
   return { counts, total: room.votes.size };
 }
@@ -1028,7 +1087,7 @@ function resolveVoting(room) {
     const voter = room.players.get(voterId);
     const target = room.players.get(targetId);
     if (!voter?.alive || !target?.alive) continue;
-    const weight = voteWeight(voter);
+    const weight = voteWeight(voter, room);
     counts.set(targetId, (counts.get(targetId) || 0) + weight);
   }
   if (!counts.size) {
@@ -1105,8 +1164,9 @@ function hunterShoot(room, socket, targetId) {
 function killPlayer(room, target, reason, source) {
   if (!target.alive) return false;
 
-  if (source === 'night' && hasPower(target, 'power_lucky_charm') && !target.powerUsedLucky) {
+  if (source === 'night' && hasActivePower(target, 'power_lucky_charm') && !target.powerUsedLucky) {
     target.powerUsedLucky = true;
+    consumePowerItem(target, 'power_lucky_charm', room, 'Lucky Charm');
     target.roundStats.savedByCharm = (target.roundStats.savedByCharm || 0) + 1;
     personalAnim(target.id, 'saved', 'Lucky Charm Aktif', 'Jimat keberuntungan menyelamatkanmu dari kematian malam ini.', { aura: 'green' });
     roomAnim(room, 'saved', 'Lucky Charm Menyala', `${target.name} lolos dari serangan malam karena Lucky Charm.`, { targetId: target.id });
@@ -1407,11 +1467,12 @@ io.on('connection', socket => {
     const item = SHOP_BY_ID.get(String(itemId || ''));
     if (!user) return cb?.({ ok: false, error: 'Belum login.' });
     if (!item) return cb?.({ ok: false, error: 'Item tidak ditemukan.' });
-    if (hasOwned(user, item.id)) return cb?.({ ok: false, error: 'Item sudah dimiliki.' });
+    const alreadyOwned = hasOwned(user, item.id);
+    if (item.type !== 'power' && alreadyOwned) return cb?.({ ok: false, error: 'Item kosmetik sudah dimiliki.' });
     if (!user.isAdmin && (user.points || 0) < item.price) return cb?.({ ok: false, error: 'Poin belum cukup.' });
     if (!user.isAdmin) user.points -= item.price;
     else user.points = ADMIN_POINTS;
-    user.inventory[item.id] = 1;
+    user.inventory[item.id] = Number(user.inventory[item.id] || 0) + 1;
     user.updatedAt = Date.now();
     saveDbSoon();
     notifyProfile(socket, key);
@@ -1425,6 +1486,7 @@ io.on('connection', socket => {
     if (!user) return cb?.({ ok: false, error: 'Belum login.' });
     if (!item) return cb?.({ ok: false, error: 'Item tidak ditemukan.' });
     if (!hasOwned(user, item.id)) return cb?.({ ok: false, error: 'Kamu belum punya item ini.' });
+    if (item.type === 'power' && !canEquipPower(user, item.id)) return cb?.({ ok: false, error: 'Stok item power ini sudah habis.' });
     user.equipped = user.equipped || {};
     user.equipped[item.type] = item.id;
     user.updatedAt = Date.now();
@@ -1471,7 +1533,11 @@ io.on('connection', socket => {
       frame: profile.equipped?.frame || null,
       badge: profile.equipped?.badge || null,
       power: profile.equipped?.power || null,
-      roundStats: defaultRoundStats()
+      roundStats: defaultRoundStats(),
+      powerConsumed: false,
+      consumedPowerId: null,
+      powerVoteDay: null,
+      wolfDoubleDay: null
     };
     room.players.set(playerId, p);
     rooms.set(code, room);
@@ -1517,7 +1583,11 @@ io.on('connection', socket => {
       frame: profile.equipped?.frame || null,
       badge: profile.equipped?.badge || null,
       power: profile.equipped?.power || null,
-      roundStats: defaultRoundStats()
+      roundStats: defaultRoundStats(),
+      powerConsumed: false,
+      consumedPowerId: null,
+      powerVoteDay: null,
+      wolfDoubleDay: null
     };
     room.players.set(playerId, p);
     bindSocketToPlayer(socket, room, p);
@@ -1650,10 +1720,14 @@ io.on('connection', socket => {
     const voter = ctx?.player;
     const target = room?.players.get(targetId);
     if (!room || room.phase !== 'voting' || !voter?.alive || !target?.alive || targetId === voter.id) return;
+    if (!voter.powerVoteDay && hasActivePower(voter, 'power_vote_triple')) {
+      consumePowerItem(voter, 'power_vote_triple', room, 'Royal Ballot');
+      voter.powerVoteDay = room.day;
+    }
     room.votes.set(voter.id, targetId);
     voter.roundStats = voter.roundStats || defaultRoundStats();
     voter.roundStats.votesCast += 1;
-    personalAnim(voter.id, 'vote', 'Vote Terkunci', `Kamu memilih ${target.name}. Suaramu bernilai ${voteWeight(voter)}.`, { aura: 'amber' });
+    personalAnim(voter.id, 'vote', 'Vote Terkunci', `Kamu memilih ${target.name}. Suaramu bernilai ${voteWeight(voter, room)}.`, { aura: 'amber' });
     sendState(room);
     if (room.votes.size >= alivePlayers(room).length) {
       setTimeout(() => { if (room.phase === 'voting') resolveVoting(room); }, 800);

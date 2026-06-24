@@ -1,7 +1,7 @@
 {
   "name": "werewolf-by-ryuu",
-  "version": "3.1.0",
-  "description": "Werewolf by Ryuu - Profile Pages, Stable Reconnect, Owner Account, Shop, Inventory, Leaderboard, Shared Music, Voice",
+  "version": "3.2.0",
+  "description": "Werewolf by Ryuu - Separate Profile Pages, Consumable Power Items, 3D Cinematics, Shop, Inventory, Leaderboard, Shared Music, Voice",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
